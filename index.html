@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>IDECO V28 — Phát triển khách hàng · Giữ khách theo nhân viên</title>
+<title>IDECO V31 — Phát triển khách hàng · Nhớ đăng nhập · HOME ERP</title>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -68,6 +68,14 @@ button{cursor:pointer}
 .settings-password-secure::-ms-clear{display:none!important}
 .login-error{min-height:20px;color:#b91c1c;font-size:13px;font-weight:700;margin:4px 0}
 .login-note{font-size:12px;color:#8b8b8b;line-height:1.5;margin-top:12px}
+
+.login-pass-wrap{position:relative}
+.login-pass-wrap input{padding-right:52px}
+.login-eye{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:38px;height:34px;border:0;border-radius:9px;background:#f7f7f8;color:#64748b;display:grid;place-items:center;font-size:17px;cursor:pointer}
+.login-eye:hover{background:#eef2f7;color:#b91c1c}
+.remember-login{display:flex;align-items:center;gap:8px;margin:8px 0 12px;font-size:13px;font-weight:700;color:#475569;cursor:pointer;user-select:none}
+.remember-login input{width:17px;height:17px;accent-color:#d71920;cursor:pointer}
+.header-actions a.btn{text-decoration:none;white-space:nowrap}
 
 header{
   position:sticky;top:0;z-index:100;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);
@@ -303,11 +311,15 @@ tbody tr:hover td{background:#fff3f3}
     </div>
     <div class="field">
       <label>Mật khẩu vào ứng dụng</label>
-      <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu">
+      <div class="login-pass-wrap">
+        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu">
+        <button id="loginEyeBtn" class="login-eye" type="button" title="Hiện/ẩn mật khẩu" aria-label="Hiện mật khẩu">👁️</button>
+      </div>
     </div>
+    <label class="remember-login"><input id="rememberLogin" type="checkbox" checked> Ghi nhớ mật khẩu trên máy này</label>
     <div id="loginError" class="login-error"></div>
     <button id="loginBtn" class="btn btn-red" style="width:100%">🔐 Vào ứng dụng</button>
-    <div class="login-note">Mật khẩu mặc định/khôi phục: <b>ideco@2026</b>. Nếu Firebase đang giữ mật khẩu cũ, đăng nhập bằng mật khẩu này sẽ tự khôi phục và đồng bộ lại cho các máy.</div>
+    <div class="login-note">Khi bật “Ghi nhớ mật khẩu”, ứng dụng sẽ tự điền lại mật khẩu trên chính trình duyệt/máy này. Chỉ nên dùng trên máy làm việc tin cậy.</div>
   </div>
 </div>
 
@@ -323,6 +335,7 @@ tbody tr:hover td{background:#fff3f3}
       <button class="btn btn-light" id="helpBtn">📘 Hướng dẫn</button>
       <button class="btn btn-light" id="clearSendCacheBtn">🧹 Xóa cache gửi</button>
       <button class="btn btn-light" id="weeklyReportBtn">📊 Báo cáo tuần</button>
+      <a class="btn btn-light" id="homeErpBtn" href="https://erp-ideco.skyit.vn/#/app/dashboard/main" target="_blank" rel="noopener noreferrer" title="Mở HOME ERP IDECO">🏠 HOME ERP</a>
       <button class="btn btn-light" id="settingsBtn">⚙️ Cài đặt</button>
       <button class="btn btn-light" id="logoutBtn">🔒 Khóa</button>
     </div>
@@ -1829,7 +1842,7 @@ async function savePasswords(){
   const nl=$('newLoginPass').value.trim(),na=$('newAdminPass').value.trim();
   if(!nl&&!na){$('passwordSaveStatus').textContent='Chưa nhập mật khẩu mới.';return}
   const updates={updatedAt:Date.now()};
-  if(nl){updates.loginHash=await sha256(nl);state.loginHash=updates.loginHash;localStorage.setItem('ideco_cdev_login_hash',updates.loginHash)}
+  if(nl){updates.loginHash=await sha256(nl);state.loginHash=updates.loginHash;localStorage.setItem('ideco_cdev_login_hash',updates.loginHash);if($('rememberLogin')&&$('rememberLogin').checked){$('loginPassword').value=nl;saveRememberedLogin(nl)}}
   if(na){updates.adminHash=await sha256(na);state.adminHash=updates.adminHash;localStorage.setItem('ideco_cdev_admin_hash',updates.adminHash)}
   try{await database.ref(ROOT+'/access').update(updates);$('passwordSaveStatus').textContent='✅ Đã lưu và đồng bộ mọi máy.'}
   catch(e){$('passwordSaveStatus').textContent='⚠️ Đã lưu máy này; Firebase lỗi: '+(e.message||e)}
@@ -2060,6 +2073,42 @@ async function testGeminiSettings(){
   finally{$('testGeminiConfig').disabled=false;}
 }
 
+// V31 — nhớ mật khẩu đăng nhập trên từng máy + nút mắt xem/ẩn
+const LOGIN_REMEMBER_KEY='ideco_cdev_login_password_v31';
+const LOGIN_REMEMBER_FLAG='ideco_cdev_login_remember_v31';
+function loadRememberedLogin(){
+  try{
+    const flag=localStorage.getItem(LOGIN_REMEMBER_FLAG);
+    const saved=localStorage.getItem(LOGIN_REMEMBER_KEY)||'';
+    const remember=(flag===null)?true:(flag==='1');
+    if($('rememberLogin')) $('rememberLogin').checked=remember;
+    if(remember && saved && $('loginPassword')) $('loginPassword').value=saved;
+  }catch(_){ }
+}
+function saveRememberedLogin(raw){
+  try{
+    const remember=!!($('rememberLogin')&&$('rememberLogin').checked);
+    localStorage.setItem(LOGIN_REMEMBER_FLAG,remember?'1':'0');
+    if(remember) localStorage.setItem(LOGIN_REMEMBER_KEY,String(raw||''));
+    else localStorage.removeItem(LOGIN_REMEMBER_KEY);
+  }catch(_){ }
+}
+function clearRememberedLogin(){
+  try{localStorage.setItem(LOGIN_REMEMBER_FLAG,'0');localStorage.removeItem(LOGIN_REMEMBER_KEY);}catch(_){ }
+}
+loadRememberedLogin();
+if($('loginEyeBtn')) $('loginEyeBtn').addEventListener('click',()=>{
+  const inp=$('loginPassword'); if(!inp)return;
+  const show=inp.type==='password'; inp.type=show?'text':'password';
+  $('loginEyeBtn').textContent=show?'🙈':'👁️';
+  $('loginEyeBtn').setAttribute('aria-label',show?'Ẩn mật khẩu':'Hiện mật khẩu');
+  inp.focus();
+});
+if($('rememberLogin')) $('rememberLogin').addEventListener('change',()=>{
+  if(!$('rememberLogin').checked) clearRememberedLogin();
+  else saveRememberedLogin($('loginPassword').value);
+});
+
 // Events
 $('loginBtn').addEventListener('click',async()=>{
   const raw=String($('loginPassword').value||'');
@@ -2067,6 +2116,7 @@ $('loginBtn').addEventListener('click',async()=>{
   const defaultHash=await sha256(DEFAULT_LOGIN_PASS);
   const isRecovery=(raw===DEFAULT_LOGIN_PASS);
   if(h===state.loginHash || isRecovery){
+    saveRememberedLogin(raw);
     $('loginGate').style.display='none';
     $('loginError').textContent='';
     // V27: ideco@2026 luôn là mật khẩu khôi phục. Nếu Firebase/localStorage còn
@@ -2083,7 +2133,13 @@ $('loginBtn').addEventListener('click',async()=>{
   }
 });
 $('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click()});
-$('logoutBtn').addEventListener('click',()=>{$('loginPassword').value='';$('loginGate').style.display='flex';setTimeout(()=>$('loginPassword').focus(),80)});
+$('logoutBtn').addEventListener('click',()=>{
+  const remember=!!($('rememberLogin')&&$('rememberLogin').checked);
+  let saved='';try{saved=remember?(localStorage.getItem(LOGIN_REMEMBER_KEY)||''):'';}catch(_){ }
+  $('loginPassword').type='password'; if($('loginEyeBtn'))$('loginEyeBtn').textContent='👁️';
+  $('loginPassword').value=saved;
+  $('loginGate').style.display='flex';setTimeout(()=>$('loginPassword').focus(),80)
+});
 $('helpBtn').addEventListener('click',openHelp);
 $('helpClose').addEventListener('click',closeHelp);
 $('helpModal').addEventListener('click',e=>{if(e.target===$('helpModal'))closeHelp()});
