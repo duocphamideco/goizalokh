@@ -3353,5 +3353,222 @@ body.v29-image-only #v29ImageOnlyNote{display:block}
   window.IDECO_MAP_POPUP={open:openMap,close:closeMap};
 })();
 </script>
+
+
+<!-- ===== V32 MOBILE-FIRST UI: giao diện tối giản, thao tác một tay ===== -->
+<style id="ideco-v32-mobile-style">
+:root{--mobile-nav-h:68px}
+.mobile-only{display:none!important}
+.ideco-mobile-menu-btn,.ideco-mobile-drawer,.ideco-mobile-drawer-backdrop,.ideco-mobile-bottom-nav{display:none}
+.mobile-collapse-btn{display:none}
+
+@media (max-width:820px){
+  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+  body{background:#f8fafc;padding-bottom:calc(var(--mobile-nav-h) + env(safe-area-inset-bottom));overflow-x:hidden}
+  body.mobile-drawer-open{overflow:hidden}
+  .desktop-only{display:none!important}.mobile-only{display:flex!important}
+  button,input,select,textarea{font-size:16px!important}
+  input,select,textarea{min-height:44px}
+  .btn{min-height:44px;border-radius:12px;padding:10px 12px}
+
+  /* Header chỉ giữ thương hiệu + trạng thái + menu */
+  header{top:0;box-shadow:0 1px 12px rgba(15,23,42,.08);border-bottom:1px solid #e5e7eb;background:rgba(255,255,255,.97)}
+  .header-inner{padding:8px 10px;gap:8px;min-height:58px}
+  .brand{min-width:0;flex:1;gap:8px}.brand .logo-icon{width:36px;height:36px;border-radius:10px}.brand-name{font-size:18px}.brand-sub{display:none}
+  .header-title,.header-actions{display:none!important}
+  .ideco-mobile-head-status{display:flex!important;align-items:center;gap:7px;min-width:0;padding:6px 8px;border-radius:999px;background:#f8fafc;border:1px solid #e2e8f0;color:#475569;font-size:11px;font-weight:800}
+  .ideco-mobile-head-status .sync-dot{width:8px;height:8px;box-shadow:none}
+  .ideco-mobile-menu-btn{display:grid;width:42px;height:42px;place-items:center;border:1px solid #e2e8f0;border-radius:12px;background:#fff;color:#334155;font-size:22px;font-weight:900;flex:0 0 auto}
+
+  main{padding:10px 8px 20px;max-width:none}
+  .hero-grid{display:flex;flex-direction:column;gap:10px}
+  .operator-card{order:1}.mobile-send-card{order:2}.mobile-image-card{order:3}
+  .card{border-radius:15px;box-shadow:0 3px 14px rgba(15,23,42,.06);border-color:#e7e5e4;overflow:hidden}
+  .card-head{padding:11px 12px;min-height:50px;background:#fff;position:relative}
+  .card-head h2{font-size:15px;line-height:1.3;padding-right:34px}
+  .card-body,.batch-panel{padding:11px 10px}
+  .mobile-collapse-btn{display:grid;place-items:center;position:absolute;right:9px;top:50%;transform:translateY(-50%);width:32px;height:32px;border:0;border-radius:10px;background:#f1f5f9;color:#475569;font-size:16px;z-index:2}
+  .mobile-collapsed>.operator-body,.mobile-collapsed>.image-wrap,.mobile-collapsed>.image-meta,.mobile-collapsed>.batch-panel,
+  .table-card.mobile-collapsed>.toolbar,.table-card.mobile-collapsed>.table-wrap,.table-card.mobile-collapsed>.footer-note{display:none!important}
+  .mobile-collapsed .mobile-collapse-btn{transform:translateY(-50%) rotate(-90deg)}
+
+  /* Nhân viên */
+  .operator-body{grid-template-columns:1fr!important;gap:8px;padding:10px}
+  .operator-body .field{margin:0}.operator-save-wrap .btn{width:100%}
+  .operator-status{padding:9px 10px;line-height:1.45;font-size:12px}
+
+  /* Ảnh */
+  .image-wrap{min-height:160px;max-height:52vh}.image-wrap img{max-height:52vh!important;object-fit:contain}
+  .image-meta{padding:9px 10px;display:block}.local-image-note{display:none}.image-meta>div:first-child{margin-bottom:8px}
+  .local-image-tools{display:grid;grid-template-columns:1fr 1fr;gap:8px}.local-file-btn{justify-content:center;min-height:44px;border-radius:11px;grid-column:1/-1}
+  .local-image-tools .btn{width:100%}
+
+  /* Zalo: ưu tiên nút chính */
+  #v22ManualSend{margin:4px 0 10px!important;padding:9px!important;border-radius:12px!important;border-left-width:4px!important;box-shadow:none!important}
+  #v22ManualSend .v22-head{margin-bottom:7px!important}.v22-title{font-size:13.5px!important}
+  #v22ManualSend .v22-current{padding:9px 10px!important;margin-bottom:8px!important}
+  #v22ManualSend .v22-actions{display:grid!important;grid-template-columns:1fr 1fr;gap:7px!important}
+  #v22ManualSend .v22-actions button{width:100%!important;min-height:44px;padding:9px 7px!important;font-size:13px!important}
+  #v22Sent{grid-column:1/-1}.v22-warning{display:none!important}.v22-status{font-size:12px!important;padding:8px!important}
+  #v23OnePasteBox{margin:0 0 9px!important;padding:10px!important;border-radius:12px!important;box-shadow:none!important}
+  #v23OnePasteBox .v23-title{font-size:14px!important}.v23-desc{font-size:11.5px!important;line-height:1.45!important}
+  #v23OnePasteBox .v23-actions{display:grid!important;grid-template-columns:1fr!important;gap:7px!important}
+  #v23OnePasteBox .v23-actions button{width:100%!important;min-height:48px!important;font-size:14px!important}
+  #v25OpenPc{font-size:14px!important}
+  #v29SendMode{padding:8px!important;margin-top:8px!important}.v29-options{display:grid!important;grid-template-columns:1fr!important;gap:7px!important}.v29-mode{min-width:0!important;width:100%;padding:8px!important}
+  #v26Customize{padding:9px!important;margin-top:8px!important}
+  .mobile-send-advanced-toggle{width:100%;min-height:44px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;color:#334155;font-weight:900;margin:8px 0 4px}
+  .batch-panel.mobile-advanced-hidden>.selected-list,
+  .batch-panel.mobile-advanced-hidden>.message-box,
+  .batch-panel.mobile-advanced-hidden>#v26Customize{display:none!important}
+  .selected-list{max-height:150px;padding:8px;margin:8px 0}.message-box{padding:9px;margin-top:8px}.message-box textarea{min-height:170px}
+  .message-tools{display:grid;grid-template-columns:1fr 1fr}.message-tools .btn{width:100%}.message-tools .small{grid-column:1/-1}
+  #batchStatus{font-size:12px;padding:8px 10px;margin-top:8px}
+
+  /* Danh sách khách: chuyển bảng thành card */
+  .table-card{margin-top:10px;scroll-margin-top:68px}
+  .toolbar{padding:9px;display:grid;grid-template-columns:1fr 1fr;gap:7px;position:sticky;top:58px;z-index:25;background:rgba(255,255,255,.98);box-shadow:0 2px 8px rgba(15,23,42,.05)}
+  .toolbar .search{grid-column:1/-1;min-width:0;width:100%}.search input{padding:11px 12px 11px 38px}
+  .toolbar .btn{width:100%;font-size:13px!important;padding:8px!important}
+  .table-wrap{max-height:none;overflow:visible;padding:6px 7px 10px;background:#f8fafc}
+  table{min-width:0!important;width:100%;font-size:13px}#customerBody, #customerBody tr,#customerBody td{display:block;width:100%}
+  .table-card thead{display:none}
+  #customerBody tr{position:relative;margin:8px 0;padding:8px 9px 9px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;box-shadow:0 2px 9px rgba(15,23,42,.05)}
+  #customerBody tr td{background:transparent!important;border:0!important;padding:6px 4px 6px 104px;min-height:30px;white-space:normal;overflow-wrap:anywhere;position:relative;line-height:1.38}
+  #customerBody tr td::before{position:absolute;left:4px;top:7px;width:94px;color:#64748b;font-size:10.5px;font-weight:900;text-transform:uppercase;letter-spacing:.2px}
+  #customerBody tr td:nth-child(1){padding:3px 4px 7px;min-height:40px;border-bottom:1px dashed #e2e8f0!important;margin-bottom:3px}
+  #customerBody tr td:nth-child(1)::before{display:none}
+  #customerBody tr td:nth-child(2){padding:8px 4px 8px;font-size:15px;color:#7f1d1d}.customer-name{font-weight:950}
+  #customerBody tr td:nth-child(2)::before{display:none}
+  #customerBody tr td:nth-child(3)::before{content:'Liên hệ'}
+  #customerBody tr td:nth-child(4)::before{content:'Điện thoại'}
+  #customerBody tr td:nth-child(5)::before{content:'Địa chỉ'}
+  #customerBody tr td:nth-child(6)::before{content:'Phụ trách'}
+  #customerBody tr td:nth-child(7){padding:7px 4px 2px}
+  #customerBody tr td:nth-child(7)::before{display:none}
+  .pick-wrap{display:grid!important;grid-template-columns:28px 30px 1fr;gap:7px}.pick-wrap input{width:22px;height:22px}.order-badge{width:28px;height:28px}
+  .row-zalo{width:100%;min-height:44px;border-radius:11px;font-size:14px!important}
+  .phone-link,.map-link{display:inline-block;min-height:28px;padding-top:3px}.footer-note{padding:9px 10px;line-height:1.45}
+
+  /* Modal full-screen nhẹ, tránh cửa sổ bé khó thao tác */
+  .modal{padding:0;align-items:flex-end}.modal-box,.report-modal-box{width:100%!important;max-width:none!important;max-height:94dvh!important;border-radius:18px 18px 0 0!important}
+  .modal-head{padding:11px 12px}.modal-head h3{font-size:15px;line-height:1.25}.modal-body{padding:11px}
+  .settings-grid,.mapping-grid,.manual-grid,.ai-card-grid,.staff-admin-grid{grid-template-columns:1fr!important}
+  .setting-card{border-radius:12px}.setting-card .sc-title{font-size:14px}.setting-card .sc-body{padding:10px}
+  .report-summary-grid{grid-template-columns:1fr 1fr!important}.report-kpi{padding:9px}.report-kpi b{font-size:19px}
+  .report-toolbar{display:grid;grid-template-columns:1fr 1fr}.report-toolbar input,.report-toolbar .week-label{grid-column:1/-1!important;min-width:0!important;width:100%!important;margin-left:0!important}
+  .report-toolbar .btn{width:100%}.report-table-wrap{max-height:55dvh}
+  .ideco-map-shell{height:92dvh!important}
+
+  /* Login tối giản */
+  #loginGate{padding:10px}.login-card{width:100%;max-width:480px;padding:18px 14px;border-radius:18px}.logo-mark{font-size:27px}.logo-icon{width:40px;height:40px}
+  .login-card h1{font-size:18px;margin:10px 0 4px}.login-card>p{font-size:12px;margin-bottom:10px}.login-mission{padding:10px;margin:10px 0}.login-mission .mission-main{font-size:12px;line-height:1.45}.login-mission .mission-sub{display:none}
+
+  /* Drawer */
+  .ideco-mobile-drawer-backdrop{display:block;position:fixed;inset:0;z-index:21000;background:rgba(15,23,42,.42);opacity:0;pointer-events:none;transition:.2s}
+  .ideco-mobile-drawer{display:flex;position:fixed;z-index:21001;right:0;top:0;bottom:0;width:min(86vw,360px);background:#fff;box-shadow:-12px 0 38px rgba(15,23,42,.22);transform:translateX(102%);transition:.22s ease;flex-direction:column;padding:calc(12px + env(safe-area-inset-top)) 12px calc(18px + env(safe-area-inset-bottom));overflow:auto}
+  body.mobile-drawer-open .ideco-mobile-drawer-backdrop{opacity:1;pointer-events:auto}body.mobile-drawer-open .ideco-mobile-drawer{transform:none}
+  .ideco-mobile-drawer-head{display:flex;align-items:center;gap:10px;padding:5px 3px 13px;border-bottom:1px solid #e5e7eb;margin-bottom:9px}.ideco-mobile-drawer-head b{font-size:17px;color:#991b1b;flex:1}.ideco-mobile-drawer-close{width:38px;height:38px;border:0;border-radius:10px;background:#f1f5f9;font-size:20px}
+  .ideco-mobile-menu-group{font-size:11px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;padding:10px 6px 6px}
+  .ideco-mobile-menu-item{width:100%;min-height:48px;border:0;border-bottom:1px solid #f1f5f9;background:#fff;display:flex;align-items:center;gap:11px;text-align:left;padding:8px 9px;border-radius:10px;color:#334155;font-weight:850}.ideco-mobile-menu-item:active{background:#f8fafc}.ideco-mobile-menu-item .mi{width:30px;text-align:center;font-size:19px}.ideco-mobile-menu-item.danger{color:#b91c1c}
+  .ideco-mobile-menu-note{margin-top:auto;padding:10px;border-radius:11px;background:#f8fafc;color:#64748b;font-size:11.5px;line-height:1.45}
+
+  /* Bottom nav */
+  .ideco-mobile-bottom-nav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:5000;height:calc(var(--mobile-nav-h) + env(safe-area-inset-bottom));padding:5px 7px calc(5px + env(safe-area-inset-bottom));background:rgba(255,255,255,.97);border-top:1px solid #e2e8f0;box-shadow:0 -8px 26px rgba(15,23,42,.09);backdrop-filter:blur(14px)}
+  .ideco-mobile-nav-btn{border:0;background:transparent;border-radius:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#64748b;font-size:10.5px;font-weight:850;min-width:0;position:relative}.ideco-mobile-nav-btn .ico{font-size:20px;line-height:1}.ideco-mobile-nav-btn:active,.ideco-mobile-nav-btn.active{background:#fff1f2;color:#b91c1c}
+  .ideco-mobile-nav-count{position:absolute;top:2px;left:calc(50% + 7px);min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#d71920;color:#fff;font-size:10px;display:grid;place-items:center;border:2px solid #fff}
+  .mobile-scroll-target{scroll-margin-top:66px}
+  .toast{right:8px;left:8px;bottom:calc(var(--mobile-nav-h) + 10px + env(safe-area-inset-bottom));max-width:none;border-radius:12px}
+}
+</style>
+
+<script id="ideco-v32-mobile-js">
+(function IDECO_V32_MOBILE(){
+  'use strict';
+  if(window.__IDECO_V32_MOBILE__)return;window.__IDECO_V32_MOBILE__=true;
+  const $=id=>document.getElementById(id);
+  const isMobile=()=>window.matchMedia('(max-width:820px)').matches;
+  function scrollToEl(el){if(!el)return;el.classList.remove('mobile-collapsed');setTimeout(()=>el.scrollIntoView({behavior:'smooth',block:'start'}),30)}
+  function closeDrawer(){document.body.classList.remove('mobile-drawer-open')}
+  function openDrawer(){document.body.classList.add('mobile-drawer-open')}
+  function tap(id){closeDrawer();setTimeout(()=>$(id)?.click(),70)}
+  function buildDrawer(){
+    if($('idecoMobileDrawer'))return;
+    const back=document.createElement('div');back.id='idecoMobileDrawerBackdrop';back.className='ideco-mobile-drawer-backdrop';back.addEventListener('click',closeDrawer);
+    const drawer=document.createElement('aside');drawer.id='idecoMobileDrawer';drawer.className='ideco-mobile-drawer';drawer.setAttribute('aria-label','Menu chức năng');
+    drawer.innerHTML=`<div class="ideco-mobile-drawer-head"><b>iDECO · Menu</b><button class="ideco-mobile-drawer-close" type="button" aria-label="Đóng">✕</button></div>
+      <div class="ideco-mobile-menu-group">Chức năng</div>
+      <button class="ideco-mobile-menu-item" data-action="help"><span class="mi">📘</span><span>Hướng dẫn sử dụng</span></button>
+      <button class="ideco-mobile-menu-item" data-action="report"><span class="mi">📊</span><span>Báo cáo tuần</span></button>
+      <button class="ideco-mobile-menu-item" data-action="erp"><span class="mi">🏠</span><span>HOME ERP IDECO</span></button>
+      <button class="ideco-mobile-menu-item" data-action="settings"><span class="mi">⚙️</span><span>Cài đặt ứng dụng</span></button>
+      <div class="ideco-mobile-menu-group">Giao diện</div>
+      <button class="ideco-mobile-menu-item" data-action="expand"><span class="mi">↕️</span><span>Mở tất cả các khối</span></button>
+      <button class="ideco-mobile-menu-item" data-action="collapse"><span class="mi">🗜️</span><span>Thu gọn các khối phụ</span></button>
+      <div class="ideco-mobile-menu-group">Hệ thống</div>
+      <button class="ideco-mobile-menu-item" data-action="cache"><span class="mi">🧹</span><span>Xóa cache gửi</span></button>
+      <button class="ideco-mobile-menu-item danger" data-action="logout"><span class="mi">🔒</span><span>Khóa ứng dụng</span></button>
+      <div class="ideco-mobile-menu-note">Mobile V32 ưu tiên thao tác một tay. Các chức năng cũ vẫn giữ nguyên và chỉ được sắp xếp/thu gọn lại.</div>`;
+    drawer.querySelector('.ideco-mobile-drawer-close').addEventListener('click',closeDrawer);
+    drawer.addEventListener('click',e=>{
+      const b=e.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;
+      if(a==='help')return tap('helpBtn');if(a==='report')return tap('weeklyReportBtn');if(a==='settings')return tap('settingsBtn');if(a==='cache')return tap('clearSendCacheBtn');if(a==='logout')return tap('logoutBtn');
+      if(a==='erp'){closeDrawer();const href=$('homeErpBtn')?.href;if(href)window.open(href,'_blank','noopener');return}
+      if(a==='expand'){document.querySelectorAll('.card.mobile-collapsible').forEach(x=>x.classList.remove('mobile-collapsed'));closeDrawer();return}
+      if(a==='collapse'){document.querySelectorAll('.card.mobile-collapsible').forEach(x=>{if(!x.classList.contains('operator-card')&&!x.classList.contains('mobile-send-card'))x.classList.add('mobile-collapsed')});closeDrawer();return}
+    });
+    document.body.append(back,drawer);
+  }
+  function buildHeaderMobile(){
+    const h=document.querySelector('.header-inner');if(!h||$('idecoMobileMenuBtn'))return;
+    const status=document.createElement('div');status.className='ideco-mobile-head-status mobile-only';status.innerHTML='<span class="sync-dot"></span><span>Online</span>';h.appendChild(status);
+    const btn=document.createElement('button');btn.id='idecoMobileMenuBtn';btn.className='ideco-mobile-menu-btn';btn.type='button';btn.setAttribute('aria-label','Mở menu');btn.textContent='☰';btn.addEventListener('click',openDrawer);h.appendChild(btn);
+    const source=$('syncDot'),txt=$('syncText'),dot=status.querySelector('.sync-dot'),label=status.querySelector('span:last-child');
+    const sync=()=>{if(source){dot.className='sync-dot '+(source.classList.contains('online')?'online':source.classList.contains('offline')?'offline':'')}if(label)label.textContent=source?.classList.contains('online')?'Online':source?.classList.contains('offline')?'Offline':'Đồng bộ'};
+    sync();if(source)new MutationObserver(sync).observe(source,{attributes:true,attributeFilter:['class']});if(txt)new MutationObserver(sync).observe(txt,{childList:true,subtree:true});
+  }
+  function classifyCards(){
+    const hero=document.querySelector('.hero-grid');if(!hero)return;
+    [...hero.children].forEach(card=>{if(!(card instanceof HTMLElement))return;const title=card.querySelector('.card-head h2')?.textContent||'';if(title.includes('Ảnh gửi'))card.classList.add('mobile-image-card');if(title.includes('Gửi Zalo'))card.classList.add('mobile-send-card')});
+    document.querySelector('.table-card')?.classList.add('mobile-customer-card');
+    document.querySelectorAll('.hero-grid>.card,.table-card').forEach(card=>{card.classList.add('mobile-collapsible','mobile-scroll-target');const head=card.querySelector(':scope > .card-head');if(head&&!head.querySelector('.mobile-collapse-btn')){const b=document.createElement('button');b.className='mobile-collapse-btn';b.type='button';b.textContent='⌄';b.setAttribute('aria-label','Thu gọn/mở rộng');b.addEventListener('click',e=>{e.stopPropagation();card.classList.toggle('mobile-collapsed')});head.appendChild(b)}});
+    // Ảnh là chức năng phụ: mặc định thu gọn trên điện thoại.
+    if(isMobile())document.querySelector('.mobile-image-card')?.classList.add('mobile-collapsed');
+  }
+  function buildBottomNav(){
+    if($('idecoMobileBottomNav'))return;
+    const nav=document.createElement('nav');nav.id='idecoMobileBottomNav';nav.className='ideco-mobile-bottom-nav';
+    nav.innerHTML=`<button class="ideco-mobile-nav-btn" data-go="customers"><span class="ico">👥</span><span>Khách hàng</span></button>
+      <button class="ideco-mobile-nav-btn" data-go="send"><span class="ico">📲</span><span>Gửi Zalo</span><span id="idecoMobileSelectedCount" class="ideco-mobile-nav-count" style="display:none">0</span></button>
+      <button class="ideco-mobile-nav-btn" data-go="image"><span class="ico">🖼️</span><span>Ảnh</span></button>
+      <button class="ideco-mobile-nav-btn" data-go="menu"><span class="ico">☰</span><span>Menu</span></button>`;
+    nav.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(!b)return;nav.querySelectorAll('.ideco-mobile-nav-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');const go=b.dataset.go;if(go==='menu')return openDrawer();if(go==='customers')scrollToEl(document.querySelector('.table-card'));if(go==='send')scrollToEl(document.querySelector('.mobile-send-card'));if(go==='image')scrollToEl(document.querySelector('.mobile-image-card'))});
+    document.body.appendChild(nav);
+  }
+  function selectedCount(){
+    const badge=$('selectedBadge'),out=$('idecoMobileSelectedCount');if(!out)return;const m=(badge?.textContent||'').match(/(\d+)\s*\/\s*10/);const n=m?Number(m[1]):0;out.textContent=String(n);out.style.display=n?'grid':'none';
+  }
+  function observeSelected(){const b=$('selectedBadge');if(!b)return;selectedCount();new MutationObserver(selectedCount).observe(b,{childList:true,subtree:true,characterData:true})}
+  function buildAdvancedToggle(){
+    const panel=document.querySelector('.mobile-send-card .batch-panel');if(!panel||$('mobileSendAdvancedToggle'))return false;
+    panel.classList.add('mobile-advanced-hidden');
+    const btn=document.createElement('button');btn.id='mobileSendAdvancedToggle';btn.type='button';btn.className='mobile-send-advanced-toggle';
+    const sync=()=>{const hidden=panel.classList.contains('mobile-advanced-hidden');btn.textContent=hidden?'⚙️ Hiện mẫu thư & tùy chọn nâng cao':'⌃ Ẩn mẫu thư & tùy chọn nâng cao'};sync();
+    btn.addEventListener('click',()=>{panel.classList.toggle('mobile-advanced-hidden');sync()});
+    const anchor=$('v22ManualSend')||panel.firstElementChild;anchor?.insertAdjacentElement('afterend',btn);return true;
+  }
+  function improveMobileLinks(){
+    // Giữ người dùng ở ứng dụng: số điện thoại chỉ mở khi thật sự bấm; thêm vùng chạm lớn.
+    document.querySelector('.table-card')?.addEventListener('click',e=>{const a=e.target.closest('.phone-link');if(a&&isMobile())a.setAttribute('target','_blank')});
+  }
+  function install(){
+    document.body.classList.add('ideco-v32-mobile-ready');classifyCards();buildDrawer();buildHeaderMobile();buildBottomNav();observeSelected();improveMobileLinks();
+    let tries=0;const t=setInterval(()=>{tries++;if(buildAdvancedToggle()||tries>24)clearInterval(t)},150);
+    window.addEventListener('resize',()=>{if(!isMobile())closeDrawer()});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer()});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,80));else setTimeout(install,80);
+})();
+</script>
+
 </body>
 </html>
