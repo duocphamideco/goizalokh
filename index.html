@@ -570,7 +570,7 @@ Trân trọng mong phản hồi ạ!
           </section>
 
           <section class="setting-card" style="grid-column:1/-1">
-            <div class="sc-title">📊 Quản lý nhiều file Excel khách hàng & soi chiếu cột</div>
+            <div class="sc-title">🎯 Upload Excel KHÁCH HÀNG MỚI KHAI THÁC</div>
             <div class="sc-body">
               <div class="inline">
                 <input id="excelInput" type="file" accept=".xlsx,.xls" multiple>
@@ -592,13 +592,13 @@ Trân trọng mong phản hồi ạ!
               </div>
               <div class="inline" style="margin-top:10px">
                 <button class="btn btn-blue" id="previewImport" disabled>👁 Xem trước dữ liệu</button>
-                <button class="btn btn-green" id="saveImport" disabled>💾 Lưu file này lên Firebase</button>
+                <button class="btn btn-green" id="saveImport" disabled>💾 Lưu vào KHÁCH HÀNG MỚI</button>
                 <span class="small muted" id="importStatus"></span>
               </div>
               <div class="import-summary" id="importSummary">Chọn một hoặc nhiều file Excel. File đang được soi chiếu sẽ tô xanh. Trường Excel không có dữ liệu có thể chọn “— Không có / để trống —”.</div>
               <div id="importPreview"></div>
               <div class="excel-file-panel" style="margin-top:16px">
-                <div class="excel-file-head"><span>☁️ Các file đã lưu trên Firebase — dữ liệu giao diện tự ghép & cập nhật</span><span id="savedFileCount">0 file</span></div>
+                <div class="excel-file-head"><span>☁️ File của KHÁCH HÀNG MỚI — chỉ hiển thị trong tab khách mới</span><span id="savedFileCount">0 file</span></div>
                 <div class="excel-file-list" id="savedExcelFiles"><div class="empty" style="padding:12px">Đang tải danh sách file…</div></div>
               </div>
             </div>
@@ -1165,8 +1165,9 @@ async function seedIfNeeded(){
   // Nguồn chuẩn duy nhất = /customerFiles + /manualCustomers.
   try{
     const local=JSON.parse(localStorage.getItem('ideco_cdev_customers')||'[]');
-    if(Array.isArray(local)) state.customers=local;
-  }catch(_){ state.customers=[]; }
+    if(Array.isArray(local)) state.developmentCustomers=local.filter(c=>c&&c._source!=='partnerExcel');
+    applyCustomerSource();
+  }catch(_){ state.developmentCustomers=[];applyCustomerSource(); }
 
   // Ảnh chỉ lưu localStorage từng máy.
   const localImageRaw=localStorage.getItem('ideco_cdev_local_campaign_image') || localStorage.getItem('ideco_cdev_image');
@@ -1185,10 +1186,18 @@ function renderImage(){
   $('imageStatus').textContent=state.image?.updatedAt?'Ảnh máy này · '+timeStr(state.image.updatedAt):'Ảnh mặc định';
 }
 
+function applyCustomerSource(){
+  const mode=window.IDECO_V41?.getMode?.() || (localStorage.getItem('ideco_customer_view_mode_v41')==='partner'?'partner':'development');
+  state.customers=mode==='partner'?(state.partnerCustomers||[]):(state.developmentCustomers||[]);
+  const current=new Map(state.customers.map(c=>[customerKey(c),c]));
+  for(const k of state.selected.keys()){
+    if(current.has(k))state.selected.set(k,current.get(k));else state.selected.delete(k);
+  }
+}
 function filteredCustomers(){
   const q=norm($('searchInput').value);
-  if(!q) return state.customers;
-  return state.customers.filter(c=>norm([c.tenKhachHang,c.nguoiLienHe,c.dienThoai,c.diaChi,c.nhanVien].join(' ')).includes(q));
+  const base=state.customers||[];
+  return !q?base:base.filter(c=>norm([c.tenKhachHang,c.nguoiLienHe,c.dienThoai,c.diaChi,c.nhanVien].join(' ')).includes(q));
 }
 
 function populateManualStaff(){
@@ -1226,7 +1235,7 @@ async function saveManualCustomer(){
   };
   if(!c.tenKhachHang){$('manualCustomerStatus').textContent='❌ Cần nhập Tên khách hàng.';$('manualCustomerName').focus();return;}
   if(c.dienThoai && !localMobilePhone(c.dienThoai)){$('manualCustomerStatus').textContent='❌ SĐT không đúng định dạng di động Việt Nam.';$('manualPhone').focus();return;}
-  const duplicate=state.customers.find(x=>customerKey(x)===customerKey(c));
+  const duplicate=(state.developmentCustomers||[]).find(x=>customerKey(x)===customerKey(c));
   if(duplicate&&!confirm('Khách này có vẻ đã tồn tại trong danh sách. Vẫn lưu thêm bản thủ công?'))return;
   $('manualCustomerSave').disabled=true;$('manualCustomerStatus').textContent='Đang lưu lên Firebase…';
   try{
@@ -1235,7 +1244,7 @@ async function saveManualCustomer(){
     }
     const ref=database.ref(ROOT+'/manualCustomers').push();
     await ref.set({...c,createdAt:Date.now(),createdBy:state.operator.employeeName||'',createdDepartment:state.operator.department||'',source:'manual'});
-    $('manualCustomerStatus').textContent='✅ Đã lưu khách hàng thủ công. Bảng chính sẽ tự cập nhật.';
+    $('manualCustomerStatus').textContent='✅ Đã lưu khách hàng thủ công. Tab Khách hàng mới khai thác sẽ tự cập nhật.';
     toast('✅ Đã thêm khách hàng thủ công lên Firebase.',4000);resetManualCustomerForm();
   }catch(e){$('manualCustomerStatus').textContent='❌ Không lưu được: '+(e.message||e);}
   finally{$('manualCustomerSave').disabled=false;}
@@ -1892,7 +1901,7 @@ function firstNonEmptyRow(aoa){
   return 0;
 }
 function headerOptions(headers, select, field){
-  select.innerHTML='<option value="-1">— Không có / để trống —</option>'+headers.map((h,i)=>`<option value="${i}">${esc(h||('Cột '+(i+1)))}</option>`).join('');
+  select.innerHTML='<option value="-1">— Không có / để trống —</option>'+headers.map((h,i)=>`<option value="${i}">${XLSX.utils.encode_col(i)} — ${esc(h||('Cột '+(i+1)))}</option>`).join('');
   const aliases={
     name:['ten khach','khach hang','ten cong ty','cong ty','nha thuoc','ten nha thuoc'],
     contact:['nguoi lien he','lien he','nguoi phu trach','dai dien'],
@@ -1983,7 +1992,8 @@ async function rebuildCustomersFromSources(){
     merged.push({tenKhachHang:r.tenKhachHang||'',nguoiLienHe:r.nguoiLienHe||'',dienThoai:r.dienThoai||'',diaChi:r.diaChi||'',nhanVien:r.nhanVien||'',xungHo:r.xungHo||'',_source:'manual',_manualId:r.id||''});
   }
   const rows=dedupe(merged);
-  state.customers=rows;
+  state.developmentCustomers=rows;
+  applyCustomerSource();
   try{localStorage.setItem('ideco_cdev_customers',JSON.stringify(rows));}catch(_){ }
   pruneSelection();renderCustomers();
   if($('firebaseDetail')) $('firebaseDetail').textContent=`✅ Đồng bộ nguồn chuẩn: ${state.customerFiles.length} file Excel + ${state.manualCustomers.length} khách thủ công = ${rows.length} khách. Không dùng nhánh /customers cũ để ghi đè.`;
@@ -2025,15 +2035,15 @@ async function saveImport(){
   const map={name:Number($('mapName').value),contact:Number($('mapContact').value),phone:Number($('mapPhone').value),address:Number($('mapAddress').value),staff:Number($('mapStaff').value)};
   const ref=database.ref(ROOT+'/customerFiles').push();const rec={name:state.excelName||'Excel khách hàng',rowCount:state.importRows.length,uploadedAt:Date.now(),uploadedBy:state.operator.employeeName||'',department:state.operator.department||'',headerRow:Math.max(1,Number($('headerRowInput').value)||1),mapping:map,rows:rowsObject(dedupe(state.importRows))};
   $('saveImport').disabled=true;$('importStatus').textContent='Đang lưu file lên Firebase…';
-  try{await ref.set(rec);const active=state.pendingExcelFiles.find(x=>x.id===state.activePendingExcelId);if(active)active.saved=true;state.pendingExcelFiles=state.pendingExcelFiles.filter(x=>x.id!==state.activePendingExcelId);state.activePendingExcelId='';state.excelAoa=null;state.excelName='';state.importRows=[];renderPendingExcelFiles();$('importPreview').innerHTML='';$('previewImport').disabled=true;$('saveImport').disabled=true;$('reloadHeaders').disabled=true;$('importStatus').textContent=`✅ Đã lưu nguồn ${rec.name} (${rec.rowCount} khách). Bảng chính sẽ tự cập nhật.`;if(state.pendingExcelFiles.length)activatePendingExcel(state.pendingExcelFiles[0].id);toast(`✅ Đã lưu file ${esc(rec.name)} lên Firebase.`)}catch(e){$('importStatus').textContent='❌ Không lưu được: '+(e.message||e);$('saveImport').disabled=false;}
+  try{await ref.set(rec);window.IDECO_V41?.setMode('development');const active=state.pendingExcelFiles.find(x=>x.id===state.activePendingExcelId);if(active)active.saved=true;state.pendingExcelFiles=state.pendingExcelFiles.filter(x=>x.id!==state.activePendingExcelId);state.activePendingExcelId='';state.excelAoa=null;state.excelName='';state.importRows=[];renderPendingExcelFiles();$('importPreview').innerHTML='';$('previewImport').disabled=true;$('saveImport').disabled=true;$('reloadHeaders').disabled=true;$('importStatus').textContent=`✅ Đã lưu nguồn ${rec.name} (${rec.rowCount} khách). Tab Khách hàng mới khai thác sẽ tự cập nhật.`;if(state.pendingExcelFiles.length)activatePendingExcel(state.pendingExcelFiles[0].id);toast(`✅ Đã lưu file ${esc(rec.name)} lên Firebase.`)}catch(e){$('importStatus').textContent='❌ Không lưu được: '+(e.message||e);$('saveImport').disabled=false;}
 }
 async function deleteCustomerSourceFile(id){
   const f=state.customerFiles.find(x=>x.id===id);if(!f)return;if(!confirm(`Xóa nguồn Excel “${f.name||'file'}” khỏi Firebase? Bảng khách hàng sẽ tự cập nhật.`))return;
   try{await database.ref(ROOT+'/customerFiles/'+id).remove();toast('🗑 Đã xóa file nguồn. Đang cập nhật lại bảng khách hàng.');}catch(e){toast('❌ Không xóa được file: '+esc(e.message||e),6000)}
 }
 async function deleteAllCustomers(){
-  if(!confirm('Xóa TOÀN BỘ danh sách khách hàng, khách nhập thủ công VÀ tất cả nguồn Excel trên Firebase? Hành động này không xóa ảnh, nhân viên, mật khẩu hay báo cáo tuần.'))return;
-  try{await database.ref(ROOT+'/customerFiles').remove();await database.ref(ROOT+'/manualCustomers').remove();await database.ref(ROOT+'/customers').remove();localStorage.setItem('ideco_cdev_customers','[]');state.customerFiles=[];state.manualCustomers=[];state.customers=[];state.selected.clear();renderSavedCustomerFiles();renderManualCustomers();renderCustomers();updateSelectedUI();toast('🗑 Đã xóa toàn bộ nguồn Excel, khách thủ công và danh sách khách hàng.')}
+  if(!confirm('Xóa toàn bộ khách hàng MỚI KHAI THÁC, khách nhập thủ công và các file Excel của nhóm này? Danh sách khách hàng HỢP TÁC vẫn giữ nguyên. Hành động này không xóa ảnh, nhân viên, mật khẩu hay báo cáo tuần.'))return;
+  try{await database.ref(ROOT+'/customerFiles').remove();await database.ref(ROOT+'/manualCustomers').remove();await database.ref(ROOT+'/customers').remove();localStorage.setItem('ideco_cdev_customers','[]');state.customerFiles=[];state.manualCustomers=[];state.developmentCustomers=[];applyCustomerSource();renderSavedCustomerFiles();renderManualCustomers();renderCustomers();updateSelectedUI();toast('🗑 Đã xóa toàn bộ nguồn Excel, khách thủ công và danh sách khách hàng.')}
   catch(e){toast('Không xóa được: '+esc(e.message||e),6000)}
 }
 
@@ -2416,7 +2426,7 @@ $('deleteAllCustomers').addEventListener('click',deleteAllCustomers);
   function render(){
     const a=queue(),c=current(),box=$v('v22Current');if(!box)return;
     if(!a.length){box.innerHTML='<div class="v22-name">Chưa chọn khách hàng</div><div class="v22-meta">Tích chọn 1–10 khách ở bảng bên dưới. V22 xử lý thủ công từng khách theo đúng thứ tự.</div>';['v22Open','v22CopyText','v22CopyImage','v22Sent','v22Unavailable','v22Blocked','v22Next'].forEach(id=>{$v(id).disabled=true});$v('v22QueueCount').textContent='0/0';setStatus('Chưa có khách trong hàng đợi.');return}
-    const p=validLocal(c);box.innerHTML=`<div class="v22-name">${qIndex+1}/${a.length} · ${e2(c.tenKhachHang||'Khách hàng')}</div><div class="v22-meta">Người liên hệ: <b>${e2(c.nguoiLienHe||'—')}</b> · SĐT: <b>${e2(p||c.dienThoai||'—')}</b> · NV phụ trách: ${e2(c.nhanVienPhuTrach||'—')}</div>`;
+    const p=validLocal(c);box.innerHTML=`<div class="v22-name">${qIndex+1}/${a.length} · ${e2(c.tenKhachHang||'Khách hàng')}</div><div class="v22-meta">Người liên hệ: <b>${e2(c.nguoiLienHe||'—')}</b> · SĐT: <b>${e2(p||c.dienThoai||'—')}</b> · NV phụ trách: ${e2(c.nhanVien||c.nhanVienPhuTrach||'—')}</div>`;
     $v('v22QueueCount').textContent=`${qIndex+1}/${a.length}`;['v22Open','v22CopyText','v22CopyImage','v22Sent','v22Unavailable','v22Blocked'].forEach(id=>{$v(id).disabled=!p});$v('v22Next').disabled=a.length<2;try{updateMessagePreview(c)}catch(_){ }
   }
   async function report(c,statusCode,statusText,confirmed=false){
@@ -2428,6 +2438,13 @@ $('deleteAllCustomers').addEventListener('click',deleteAllCustomers);
     let w=null;try{w=window.open('https://zalo.me/'+encodeURIComponent(p),'_blank','noopener')}catch(_){w=null}
     if(!w){setStatus('Trình duyệt đã chặn cửa sổ Zalo. Hãy cho phép pop-up rồi thử lại.','bad');toast('⚠️ Không mở được Zalo vì pop-up bị chặn.',5500);await report(c,'failed','Trình duyệt chặn cửa sổ Zalo',false);return}
     setStatus(`Đã mở Zalo theo SĐT ${p}.${copyTextToo?' Thư đã được copy — sang Zalo kiểm tra đúng người rồi Ctrl+V để dán thư.':''}\nSau đó quay lại bấm “Copy ảnh”, sang Zalo Ctrl+V để dán banner.`,'ok');await report(c,'opened','Đã mở liên kết Zalo thủ công',false)
+  }
+  async function mobileOpen(c){
+    const g=gate(c);if(!g.ok){setStatus(g.msg,'bad');toast(g.msg,4500);return;}
+    const sourceMode=window.IDECO_V41?.getMode();
+    if(!await ensureClaim(c))return;
+    if(sourceMode!==window.IDECO_V41?.getMode()||!(state.customers||[]).some(x=>key(x)===key(c))){state.selected.delete(key(c));updateSelectedUI();return;}
+    window.IDECO_V46.show(c,()=>{openedKey=key(c);renderPanel();setStatus('Đã yêu cầu mở/chia sẻ qua Zalo. Kiểm tra đúng người nhận và bấm Gửi trong Zalo; sau đó quay lại xác nhận ĐÃ GỬI.','ok')});
   }
   async function openCurrent(){const c=current();if(c)await openCustomer(c,true)}
   async function copyLetter(){const c=current();if(c)await copyTextValue(customerMessage(c))}
@@ -2554,7 +2571,7 @@ Sau khi cập nhật, khách này sẽ được đánh dấu ĐÃ GỬI + tên n
     if(!c) throw new Error('Chưa chọn khách hàng.');
     const img=await loadImage(getSourceData());
     const W=1200, outer=48, inner=W-outer*2;
-    const bannerMaxH=860;
+    const bannerMaxH=12000;
     const scale=Math.min(inner/img.naturalWidth,bannerMaxH/img.naturalHeight,1.6);
     const bw=Math.max(1,Math.round(img.naturalWidth*scale));
     const bh=Math.max(1,Math.round(img.naturalHeight*scale));
@@ -2890,7 +2907,7 @@ Nội dung thư đã tự đồng bộ cách xưng hô ${r.salutation==='Anh/Ch�
     if(!c) throw new Error('Chưa chọn khách hàng.');
     const img=await loadImage(getSourceData());
     const W=Math.round(cfg.cardWidth),outer=Math.round(W*0.04),inner=W-outer*2;
-    const bannerMaxH=Math.round(W*0.72);
+    const bannerMaxH=12000; // Tự tăng chiều cao theo ảnh, giới hạn để canvas không quá lớn.
     const baseScale=Math.min(inner/img.naturalWidth,bannerMaxH/img.naturalHeight,2.4);
     let scale=baseScale*(cfg.bannerScale/100);
     // Không crop banner: chỉ phóng tới giới hạn khung.
@@ -3718,13 +3735,13 @@ body.v29-image-only #v29ImageOnlyNote{display:block}
   function webUrl(c){const p=phone(c);return 'https://chat.zalo.me/?phone='+encodeURIComponent(p)+'&openConv=true'}
   function openWindowFor(c,reuse=null){let w=reuse;try{if(!w||w.closed)w=window.open('about:blank','IDECO_ZALO_ACTIVE');if(w){w.location.href=webUrl(c);try{w.focus()}catch(_){ }activeWindow=w;return w}}catch(_){ }return null}
   async function ensureClaim(c){const cl=claim(c),me=employee();if(cl&&cl.employeeName&&same(cl.employeeName,me)&&cl.status==='holding')return true;if(window.IDECO_V28&&typeof IDECO_V28.claimCustomer==='function'){const r=await IDECO_V28.claimCustomer(c);if(!r||!r.ok)return false;try{state.selected.set(key(c),c);updateSelectedUI()}catch(_){ }return true}return true}
-  async function openSpecific(c){if(!c)return;const g=gate(c);if(!g.ok){setStatus(g.msg,'bad');try{toast('⚠️ '+esc35(g.msg),5000)}catch(_){ }return}if(!await ensureClaim(c))return;let cp;try{cp=copyPayload(c)}catch(e){cp=Promise.reject(e)}const w=openWindowFor(c);if(!w){setStatus('Trình duyệt chặn cửa sổ Zalo. Hãy cho phép pop-up cho trang này.','bad');return}openedKey=key(c);renderPanel();setStatus('Đang mở Zalo theo SĐT '+g.phone+'… Nội dung cũng đang được chuẩn bị tự động.','warn');try{await cp;setStatus('✅ Đã mở Zalo cho '+(c.tenKhachHang||g.phone)+' · '+g.phone+' và đã chuẩn bị '+(sendMode()==='image'?'ẢNH':'ẢNH + THƯ')+'.\nKiểm tra đúng tên/SĐT trên Zalo → Ctrl+V → Gửi → quay lại chỉ bấm “ĐÃ GỬI → KHÁCH TIẾP THEO”.','ok')}catch(e){setStatus('✅ Đã mở Zalo cho '+(c.tenKhachHang||g.phone)+'.\n⚠️ Chưa tự copy được nội dung: '+(e&&e.message||e)+'. Có thể bấm lại “MỞ ZALO KHÁCH NÀY”.','warn')}}
+  async function openSpecific(c){if(window.IDECO_V46?.isMobile())return mobileOpen(c);if(!c)return;const g=gate(c);if(!g.ok){setStatus(g.msg,'bad');try{toast('⚠️ '+esc35(g.msg),5000)}catch(_){ }return}if(!await ensureClaim(c))return;let cp;try{cp=copyPayload(c)}catch(e){cp=Promise.reject(e)}const w=openWindowFor(c);if(!w){setStatus('Trình duyệt chặn cửa sổ Zalo. Hãy cho phép pop-up cho trang này.','bad');return}openedKey=key(c);renderPanel();setStatus('Đang mở Zalo theo SĐT '+g.phone+'… Nội dung cũng đang được chuẩn bị tự động.','warn');try{await cp;setStatus('✅ Đã mở Zalo cho '+(c.tenKhachHang||g.phone)+' · '+g.phone+' và đã chuẩn bị '+(sendMode()==='image'?'ẢNH':'ẢNH + THƯ')+'.\nKiểm tra đúng tên/SĐT trên Zalo → Ctrl+V → Gửi → quay lại chỉ bấm “ĐÃ GỬI → KHÁCH TIẾP THEO”.','ok')}catch(e){setStatus('✅ Đã mở Zalo cho '+(c.tenKhachHang||g.phone)+'.\n⚠️ Chưa tự copy được nội dung: '+(e&&e.message||e)+'. Có thể bấm lại “MỞ ZALO KHÁCH NÀY”.','warn')}}
   async function openCurrent(){const c=current();if(c)await openSpecific(c);else setStatus('Chưa chọn khách hàng.','bad')}
   async function writeTerminal(c,status){if(!c)return{ok:false};if(status==='sent'&&window.IDECO_V28&&typeof IDECO_V28.markCustomerSent==='function')return IDECO_V28.markCustomerSent(c);const me=employee(),id=window.IDECO_V28&&IDECO_V28.claimId?IDECO_V28.claimId(c):'';if(!id||!me)return{ok:false};const ref=database.ref(ROOT+'/customerClaims/'+id);let conflict=null;try{const r=await ref.transaction(cur=>{if(cur&&cur.status==='sent'){conflict=cur;return}if(cur&&cur.employeeName&&!same(cur.employeeName,me)){conflict=cur;return}const base=cur||{};return Object.assign({},base,{employeeName:me,department:String(state.operator.department||base.department||''),sendDate:String(state.operator.sendDate||base.sendDate||''),customerName:String(c.tenKhachHang||base.customerName||''),contactName:String(c.nguoiLienHe||base.contactName||''),phone:phone(c)||base.phone||'',sourceKey:key(c)||base.sourceKey||'',status,processedBy:me,processedAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP})});if(!r.committed){if(typeof toast==='function')toast('⚠️ Không cập nhật được vì khách đã có trạng thái bởi '+esc35(conflict&&(conflict.sentBy||conflict.employeeName)||'nhân viên khác')+'.',5500);return{ok:false,conflict}}return{ok:true,claim:r.snapshot&&r.snapshot.val?r.snapshot.val():null}}catch(e){if(typeof toast==='function')toast('❌ Firebase chưa cập nhật: '+esc35(e&&e.message||e),6000);return{ok:false,error:e}}}
   async function saveActivity(c,status){try{if(!operatorReady())return;const label=status==='sent'?'Đã gửi Zalo':status==='unavailable'?'Không tìm thấy / chưa kết bạn':'Bị chặn / không thể nhắn';const ref=database.ref(ROOT+'/activityReports').push();await ref.set({employeeName:state.operator.employeeName,department:state.operator.department,sendDate:state.operator.sendDate,mode:'simple_v35',source:'simple_v35',selectedCount:1,openedCount:1,skippedCount:status==='sent'?0:1,failedCount:0,confirmedSuccessCount:status==='sent'?1:0,customers:[{tenKhachHang:c.tenKhachHang||'',nguoiLienHe:c.nguoiLienHe||'',dienThoai:phone(c)||c.dienThoai||'',status,statusText:label,confirmedSent:status==='sent',confirmedAt:status==='sent'?Date.now():null}],createdAt:Date.now(),updatedAt:Date.now()})}catch(e){console.warn('V35 activity',e)}}
-  async function finishCurrent(status){const c=current();if(!c)return;const a=queue(),next=a[1]||null;let nextWin=null;if(next){try{nextWin=window.open('about:blank','IDECO_ZALO_ACTIVE');if(nextWin){nextWin.document.write('<!doctype html><meta charset="utf-8"><title>IDECO · Đang chuyển khách</title><body style="font-family:Arial;padding:24px"><h3>IDECO</h3><p>Đang cập nhật khách vừa xử lý và chuyển sang khách tiếp theo…</p></body>');nextWin.document.close()}}catch(_){nextWin=null}}
+  async function finishCurrent(status){const c=current();if(!c)return;const a=queue(),next=a[1]||null;let nextWin=null;if(next&&!window.IDECO_V46?.isMobile()){try{nextWin=window.open('about:blank','IDECO_ZALO_ACTIVE');if(nextWin){nextWin.document.write('<!doctype html><meta charset="utf-8"><title>IDECO · Đang chuyển khách</title><body style="font-family:Arial;padding:24px"><h3>IDECO</h3><p>Đang cập nhật khách vừa xử lý và chuyển sang khách tiếp theo…</p></body>');nextWin.document.close()}}catch(_){nextWin=null}}
     const msg=status==='sent'?'Xác nhận đã GỬI ZALO cho “'+(c.tenKhachHang||'khách hàng')+'” và chuyển khách tiếp theo?':status==='unavailable'?'Ghi nhận “Không tìm thấy / Chưa kết bạn” cho khách này và chuyển khách tiếp theo?':'Ghi nhận “Bị chặn / Không thể nhắn” cho khách này và chuyển khách tiếp theo?';if(!confirm(msg)){try{if(nextWin&&!nextWin.closed)nextWin.close()}catch(_){ }return}
-    const saved=await writeTerminal(c,status);if(!saved||!saved.ok){try{if(nextWin&&!nextWin.closed)nextWin.close()}catch(_){ }return}await saveActivity(c,status);try{state.selected.delete(key(c));resetStaleCurrentCustomer();updateSelectedUI()}catch(_){ }openedKey='';try{if(window.IDECO_V28&&IDECO_V28.applyClaimMarks)IDECO_V28.applyClaimMarks()}catch(_){ }renderRows();renderPanel();const n=current();if(n){let cp;try{cp=copyPayload(n)}catch(e){cp=Promise.reject(e)}const w=openWindowFor(n,nextWin);openedKey=key(n);renderPanel();try{await cp;setStatus((status==='sent'?'✅ Đã lưu ĐÃ GỬI + tên nhân viên trên Firebase.':'✅ Đã lưu trạng thái trên Firebase.')+'\n➡ ĐÃ TỰ CHUYỂN sang '+(n.tenKhachHang||'khách tiếp theo')+' · '+phone(n)+'. Zalo đã được mở và nội dung đã chuẩn bị. Kiểm tra đúng khách rồi Ctrl+V → Gửi.','ok')}catch(e){setStatus('✅ Đã lưu khách vừa xử lý và tự mở '+(n.tenKhachHang||'khách tiếp theo')+'.\n⚠️ Chưa copy được nội dung tự động; bấm “MỞ ZALO KHÁCH NÀY” nếu cần.','warn')}}else{try{if(nextWin&&!nextWin.closed)nextWin.close()}catch(_){ }setStatus(status==='sent'?'✅ Đã lưu ĐÃ GỬI + tên nhân viên trên Firebase. Đã xử lý hết danh sách đã chọn.':'✅ Đã lưu trạng thái. Đã xử lý hết danh sách đã chọn.','ok')}}
+    const saved=await writeTerminal(c,status);if(!saved||!saved.ok){try{if(nextWin&&!nextWin.closed)nextWin.close()}catch(_){ }return}await saveActivity(c,status);try{state.selected.delete(key(c));resetStaleCurrentCustomer();updateSelectedUI()}catch(_){ }openedKey='';try{if(window.IDECO_V28&&IDECO_V28.applyClaimMarks)IDECO_V28.applyClaimMarks()}catch(_){ }renderRows();renderPanel();const n=current();if(n&&window.IDECO_V46?.isMobile()){await mobileOpen(n);return;}if(n){let cp;try{cp=copyPayload(n)}catch(e){cp=Promise.reject(e)}const w=openWindowFor(n,nextWin);openedKey=key(n);renderPanel();try{await cp;setStatus((status==='sent'?'✅ Đã lưu ĐÃ GỬI + tên nhân viên trên Firebase.':'✅ Đã lưu trạng thái trên Firebase.')+'\n➡ ĐÃ TỰ CHUYỂN sang '+(n.tenKhachHang||'khách tiếp theo')+' · '+phone(n)+'. Zalo đã được mở và nội dung đã chuẩn bị. Kiểm tra đúng khách rồi Ctrl+V → Gửi.','ok')}catch(e){setStatus('✅ Đã lưu khách vừa xử lý và tự mở '+(n.tenKhachHang||'khách tiếp theo')+'.\n⚠️ Chưa copy được nội dung tự động; bấm “MỞ ZALO KHÁCH NÀY” nếu cần.','warn')}}else{try{if(nextWin&&!nextWin.closed)nextWin.close()}catch(_){ }setStatus(status==='sent'?'✅ Đã lưu ĐÃ GỬI + tên nhân viên trên Firebase. Đã xử lý hết danh sách đã chọn.':'✅ Đã lưu trạng thái. Đã xử lý hết danh sách đã chọn.','ok')}}
   function statusInfo(cl){if(!cl)return null;if(cl.status==='sent')return{cls:'sent',row:'v35-sent-row',badge:'✅ ĐÃ GỬI ZALO · '+(cl.sentBy||cl.employeeName||'NV'),meta:(cl.department?cl.department+' · ':'')+(cl.sentAt?'gửi '+fmt(cl.sentAt):(cl.sendDate?'ngày '+cl.sendDate:''))};if(cl.status==='unavailable')return{cls:'unavailable',row:'v35-unavailable-row',badge:'⚠️ KHÔNG TÌM THẤY / CHƯA KẾT BẠN · '+(cl.processedBy||cl.employeeName||'NV'),meta:(cl.department?cl.department+' · ':'')+(cl.processedAt?'cập nhật '+fmt(cl.processedAt):(cl.sendDate?'ngày '+cl.sendDate:''))};if(cl.status==='blocked')return{cls:'blocked',row:'v35-blocked-row',badge:'⛔ BỊ CHẶN / KHÔNG THỂ NHẮN · '+(cl.processedBy||cl.employeeName||'NV'),meta:(cl.department?cl.department+' · ':'')+(cl.processedAt?'cập nhật '+fmt(cl.processedAt):(cl.sendDate?'ngày '+cl.sendDate:''))};return null}
   function renderRows(){clearTimeout(renderTimer);renderTimer=setTimeout(()=>{const body=$('customerBody');if(!body||!window.state)return;body.querySelectorAll('tr[data-key]').forEach(tr=>{tr.classList.remove('v35-sent-row','v35-unavailable-row','v35-blocked-row');tr.querySelectorAll('.v35-status-badge,.v35-status-meta,.v35-customer-status').forEach(x=>x.remove());const c=(state.customers||[]).find(x=>key(x)===tr.dataset.key);if(!c)return;const cl=claim(c),si=statusInfo(cl);if(!si)return;tr.classList.add(si.row);const cb=tr.querySelector('.pick-checkbox');if(cb){cb.checked=false;cb.disabled=true}const z=tr.querySelector('.row-zalo');if(z)z.disabled=true;const pick=tr.querySelector('.pick-wrap span:last-child');if(pick)pick.textContent=cl.status==='sent'?'Đã gửi':'Đã xử lý';const staff=tr.querySelector('td.staff')||tr.children[5];if(staff){staff.querySelectorAll('.claim-badge-v28,.claim-meta-v28,.claim-release-v28,.sent-badge-v33,.sent-meta-v33').forEach(x=>x.remove());const b=document.createElement('span');b.className='v35-status-badge '+si.cls;b.textContent=si.badge;staff.appendChild(b);const m=document.createElement('span');m.className='v35-status-meta';m.textContent=si.meta;staff.appendChild(m)}const name=tr.querySelector('.customer-name');if(name){const s=document.createElement('span');s.className='v35-customer-status '+si.cls;s.textContent=cl.status==='sent'?'✓ Đã gửi — '+(cl.sentBy||cl.employeeName||'NV'):cl.status==='unavailable'?'⚠ Chưa kết bạn/không tìm thấy — '+(cl.processedBy||cl.employeeName||'NV'):'⛔ Không thể nhắn — '+(cl.processedBy||cl.employeeName||'NV');name.appendChild(s)}})},15)}
   function findCustomerFromRow(el){const tr=el&&el.closest&&el.closest('tr[data-key]');if(!tr)return null;return (state.customers||[]).find(c=>key(c)===tr.dataset.key)||null}
@@ -3967,6 +3984,739 @@ body.v36-show-customize #v36ToggleCustomize{border-color:#8b5cf6;background:#f5f
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,180));else setTimeout(install,180);
   window.IDECO_V37={renderSendStatus:render};
+})();
+</script>
+
+
+<!-- ===== V38: HIỂN THỊ LÝ DO KHÔNG CHỌN ĐƯỢC + PHỤC HỒI PREVIEW/CHỈNH ẢNH CHO DỄ THẤY ===== -->
+<style id="ideco-v38-style">
+.v38-disabled-reason{display:block;margin-top:4px;font-size:10.5px;line-height:1.3;font-weight:800;color:#b45309}
+.v38-disabled-reason.bad{color:#b91c1c}
+.v38-disabled-reason.lock{color:#075985}
+.v38-pick-tip{display:block;margin-top:4px;font-size:10px;color:#64748b;line-height:1.3}
+#v38PreviewBar{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+#v38PreviewBar .v38-btn{border:1px solid #dbeafe;background:#fff;border-radius:10px;padding:9px 12px;min-height:42px;font-weight:900;cursor:pointer}
+#v38PreviewBar .v38-btn.primary{background:#eff6ff;color:#1d4ed8}
+#v38PreviewBar .v38-btn.purple{background:#f5f3ff;color:#6d28d9;border-color:#ddd6fe}
+#v38PreviewNote{margin:-2px 0 10px;padding:8px 10px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;color:#475569;font-size:12px;line-height:1.5}
+@media(max-width:640px){#v38PreviewBar{display:grid;grid-template-columns:1fr}.v38-disabled-reason{font-size:10px}}
+</style>
+<script id="ideco-v38-js">
+(function(){
+  'use strict';
+  function $(id){return document.getElementById(id)}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+  function key(c){try{return typeof customerKey==='function'?customerKey(c):''}catch(_){return ''}}
+  function claim(c){try{return (window.IDECO_V28&&typeof IDECO_V28.getClaim==='function'?IDECO_V28.getClaim(c):((state.customerClaims||{})[(window.IDECO_V28&&IDECO_V28.claimId?IDECO_V28.claimId(c):'')]||null))}catch(_){return null}}
+  function currentEmployeeV38(){try{return String(state&&state.operator&&state.operator.employeeName||'').trim()}catch(_){return ''}}
+  function same(a,b){try{return typeof norm==='function'?norm(a)===norm(b):String(a||'').toLowerCase().trim()===String(b||'').toLowerCase().trim()}catch(_){return String(a||'')===String(b||'')}}
+  function validPhone(c){try{return !!(typeof zaloPhone==='function'?zaloPhone(c&&c.dienThoai):String(c&&c.dienThoai||'').trim())}catch(_){return !!String(c&&c.dienThoai||'').trim()}}
+  function reasonData(c){
+    const cl=claim(c), me=currentEmployeeV38();
+    if(!validPhone(c)) return {type:'bad', text:'Thiếu SĐT Zalo hợp lệ', toast:'Khách này chưa có số điện thoại hợp lệ nên chưa thể chọn để gửi Zalo.'};
+    if(cl&&cl.status==='sent') return {type:'bad', text:'Đã gửi bởi '+(cl.sentBy||cl.employeeName||'nhân viên'), toast:'Khách này đã được gửi Zalo bởi '+(cl.sentBy||cl.employeeName||'nhân viên')+'.'};
+    if(cl&&cl.status==='holding' && (!me || !same(cl.employeeName,me))) return {type:'lock', text:'Đang do '+(cl.employeeName||'nhân viên khác')+' phụ trách', toast:'Khách này đang do '+(cl.employeeName||'nhân viên khác')+' phụ trách nên bạn chưa thể chọn.'};
+    if(cl&&cl.status==='unavailable') return {type:'bad', text:'Đã ghi nhận: chưa kết bạn/không tìm thấy', toast:'Khách này đã được ghi nhận ở trạng thái chưa kết bạn hoặc không tìm thấy.'};
+    if(cl&&cl.status==='blocked') return {type:'bad', text:'Đã ghi nhận: bị chặn/không thể nhắn', toast:'Khách này đã được ghi nhận ở trạng thái bị chặn hoặc không thể nhắn.'};
+    return null;
+  }
+  function renderReasons(){
+    const body=$('customerBody'); if(!body||!window.state) return;
+    body.querySelectorAll('tr[data-key]').forEach(tr=>{
+      const c=(state.customers||[]).find(x=>key(x)===tr.dataset.key); if(!c) return;
+      const pickCell=tr.children[0]; if(!pickCell) return;
+      pickCell.querySelectorAll('.v38-disabled-reason,.v38-pick-tip').forEach(x=>x.remove());
+      const r=reasonData(c);
+      if(r){
+        const s=document.createElement('span'); s.className='v38-disabled-reason '+r.type; s.textContent=r.text; pickCell.appendChild(s);
+      }else{
+        const s=document.createElement('span'); s.className='v38-pick-tip'; s.textContent='Có thể chọn'; pickCell.appendChild(s);
+      }
+    });
+  }
+  function installPreviewBar(){
+    const host=$('v35SimpleSend'); if(!host || $('v38PreviewBar')) return false;
+    const current=$('v35Current'); if(!current) return false;
+    const bar=document.createElement('div'); bar.id='v38PreviewBar';
+    bar.innerHTML='<button type="button" id="v38ChooseImage" class="v38-btn primary">🖼 Chọn ảnh gửi</button><button type="button" id="v38OpenPreview" class="v38-btn">👁 Xem preview ảnh + thư</button><button type="button" id="v38OpenCustomize" class="v38-btn purple">🎨 Chỉnh kích thước ảnh + chữ</button>';
+    const note=document.createElement('div'); note.id='v38PreviewNote'; note.textContent='Nếu Anh chưa thấy phần preview/chỉnh chữ: dùng 3 nút này ngay tại khung gửi Zalo. Nút “Chỉnh kích thước ảnh + chữ” sẽ tự mở khu tùy chỉnh.';
+    host.insertBefore(bar, current);
+    host.insertBefore(note, current);
+    $('v38ChooseImage')?.addEventListener('click',()=>{const b=$('chooseImageBtn')||document.querySelector('.local-file-btn input')?.parentElement; if($('chooseImageBtn')) $('chooseImageBtn').click(); else document.querySelector('.local-file-btn input')?.click(); const card=document.querySelector('.mobile-image-card')||document.querySelector('.card.mobile-image-card'); if(card){card.classList.remove('mobile-collapsed'); card.scrollIntoView({behavior:'smooth',block:'start'});} });
+    $('v38OpenPreview')?.addEventListener('click',()=>{const b=$('v23PreviewCard'); if(b){b.click();} else if(window.IDECO_V26&&typeof IDECO_V26.preview==='function'){IDECO_V26.preview();}});
+    $('v38OpenCustomize')?.addEventListener('click',()=>{document.body.classList.add('v36-show-customize'); const b=$('v36ToggleCustomize'); if(b) b.classList.add('active'); const box=$('v23OnePasteBox')||$('v26Customize'); if(box) box.scrollIntoView({behavior:'smooth',block:'start'});});
+    return true;
+  }
+  function bindDisabledHint(){
+    if(window.__V38_BOUND__) return; window.__V38_BOUND__=true;
+    document.addEventListener('click',function(e){
+      const wrap=e.target.closest('.pick-wrap,.pick-checkbox,.row-zalo');
+      if(!wrap) return;
+      const tr=e.target.closest('tr[data-key]'); if(!tr) return;
+      const c=(state.customers||[]).find(x=>key(x)===tr.dataset.key); if(!c) return;
+      const r=reasonData(c); if(!r) return;
+      if(typeof toast==='function') toast('⚠️ '+r.toast,5000); else alert(r.toast);
+      e.preventDefault(); e.stopPropagation();
+    }, true);
+  }
+  function install(){
+    if(!window.state || !$('customerBody')) return setTimeout(install,250);
+    renderReasons(); installPreviewBar(); bindDisabledHint();
+    if(typeof renderCustomers==='function' && !renderCustomers.__v38wrapped){
+      const old=renderCustomers; window.renderCustomers=function(){const r=old.apply(this,arguments); setTimeout(renderReasons,0); setTimeout(installPreviewBar,0); return r}; window.renderCustomers.__v38wrapped=true;
+    }
+    const body=$('customerBody'); if(body) new MutationObserver(()=>setTimeout(renderReasons,0)).observe(body,{childList:true,subtree:true});
+    try{database.ref(ROOT+'/customerClaims').on('value',()=>setTimeout(renderReasons,0))}catch(_){ }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(install,180)); else setTimeout(install,180);
+})();
+</script>
+
+
+<!-- ===== V39: HIỆN RÕ NÚT GỬI ZALO TRONG DANH SÁCH KHÁCH ĐÃ CHỌN ===== -->
+<style id="ideco-v39-style">
+.selected-list{padding-left:20px}
+.selected-list li{margin-bottom:10px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:10px;background:#fff}
+.selected-list .mini-btn{display:inline-flex!important;align-items:center;justify-content:center;margin-top:6px;margin-right:6px;margin-left:0!important;padding:7px 10px;border-radius:8px;font-size:12px;font-weight:900;line-height:1.2}
+.selected-list .mini-btn.copy-msg{background:#eef4ff;color:#0d47a1}
+.selected-list .mini-btn.img{background:#fff1f2;color:#b91c1c}
+.selected-list .mini-btn.zalo{background:#e8f2ff;color:#0068ff}
+.v39-action-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.v39-phone{font-weight:800;color:#0f172a}
+@media(max-width:640px){
+  .selected-list li{padding:9px 10px}
+  .v39-action-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .v39-action-row .mini-btn.zalo{grid-column:1/-1;font-size:13px;min-height:42px}
+}
+</style>
+<script id="ideco-v39-js">
+(function(){
+  'use strict';
+  function $(id){return document.getElementById(id)}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+  function renderSelectedListV39(){
+    if(!$('selectedList')||!window.state||typeof customerKey!=='function') return;
+    const arr=Array.from(state.selected.values());
+    $('selectedList').innerHTML=arr.length ? arr.map((c,i)=>{
+      const k=customerKey(c);
+      const salute=(typeof salutationForCustomer==='function' ? salutationForCustomer(c) : 'Anh/Chị');
+      return `<li><div><b>${i+1}.</b> ${esc(c.tenKhachHang||'Khách hàng')} · <span class="v39-phone">${esc(c.dienThoai||'')}</span>${c.nguoiLienHe?` · <span class="ai-salute-badge">${esc(salute)} ${esc(c.nguoiLienHe)}</span>`:''}</div><div class="v39-action-row"><button class="mini-btn copy-msg" data-key="${esc(k)}">📋 Lời chào</button><button class="mini-btn img copy-img">🖼 Ảnh</button><button class="mini-btn zalo open-zalo" data-key="${esc(k)}">📱 Gửi Zalo khách này</button></div></li>`;
+    }).join('') : '<li class="muted">Chưa chọn khách hàng.</li>';
+  }
+  function install(){
+    if(!window.state || !$('selectedList')) return setTimeout(install,250);
+    renderSelectedListV39();
+    if(typeof updateSelectedUI==='function' && !updateSelectedUI.__v39wrapped){
+      const old=updateSelectedUI;
+      window.updateSelectedUI=function(){const r=old.apply(this,arguments); setTimeout(renderSelectedListV39,0); return r;};
+      window.updateSelectedUI.__v39wrapped=true;
+    }
+    new MutationObserver(()=>setTimeout(renderSelectedListV39,0)).observe($('selectedList'),{childList:true,subtree:false});
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(install,180)); else setTimeout(install,180);
+})();
+</script>
+
+
+<!-- ===== V40: HIỆN ĐẦY ĐỦ PREVIEW + CHỈNH ẢNH/CHỮ + AI + TRẠNG THÁI NGAY KHUNG GỬI ===== -->
+<style id="ideco-v40-style">
+/* Khung thao tác chính luôn nhìn thấy */
+#v40SendTools{margin:10px 0 12px;padding:12px;border:1px solid #bfdbfe;border-left:5px solid #2563eb;border-radius:14px;background:linear-gradient(180deg,#f8fbff,#fff)}
+#v40SendTools .v40-title{font-size:14px;font-weight:950;color:#1e3a8a;margin-bottom:9px}
+#v40SendTools .v40-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:8px}
+#v40SendTools button{border:1px solid #dbeafe;border-radius:10px;background:#fff;min-height:44px;padding:9px 10px;font-weight:900;cursor:pointer;color:#0f172a}
+#v40SendTools button.preview{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+#v40SendTools button.custom{background:#f5f3ff;color:#6d28d9;border-color:#ddd6fe}
+#v40SendTools button.ai{background:#eefdf6;color:#047857;border-color:#a7f3d0}
+#v40SendTools button.image{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
+#v40EmployeeStatus{margin-top:9px;padding:9px 10px;border-radius:10px;background:#fff;border:1px solid #e2e8f0;font-size:12px;line-height:1.55;color:#334155}
+#v40EmployeeStatus b{color:#0f172a}
+#v40CurrentStatus{display:inline-flex;margin-left:6px;padding:3px 7px;border-radius:999px;font-size:10.5px;font-weight:900;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1}
+#v40CurrentStatus.sent{background:#dcfce7;color:#166534;border-color:#86efac}
+#v40CurrentStatus.holding{background:#e0f2fe;color:#075985;border-color:#7dd3fc}
+#v40CurrentStatus.blocked{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+#v40CurrentStatus.unavailable{background:#fef3c7;color:#92400e;border-color:#fcd34d}
+/* Preview cũ bị nằm trong parent hidden: V40 di chuyển ra ngoài, nhưng vẫn giữ id/logic gốc */
+#v23OnePasteBox{display:block!important;margin:10px 0 12px!important}
+#v26Customize{display:none}
+body.v40-show-customize #v26Customize{display:block!important}
+/* Mẫu thư mặc định mở để người dùng nhìn thấy */
+.batch-panel.mobile-advanced-hidden>.selected-list,
+.batch-panel.mobile-advanced-hidden>.message-box{display:block!important}
+#mobileSendAdvancedToggle{display:inline-flex!important}
+@media(max-width:900px){#v40SendTools .v40-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){#v40SendTools .v40-grid{grid-template-columns:1fr}#v40SendTools button{min-height:48px}}
+</style>
+<script id="ideco-v40-js">
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+  function esc(s){return String(s==null?'':s).replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+  function safeCustomerKey(c){try{return typeof customerKey==='function'?customerKey(c):''}catch(_){return ''}}
+  function currentSelected(){try{return Array.from(state.selected.values())[0]||null}catch(_){return null}}
+  function claimFor(c){
+    try{
+      if(!c)return null;
+      if(window.IDECO_V28&&typeof IDECO_V28.getClaim==='function')return IDECO_V28.getClaim(c);
+      const id=window.IDECO_V28&&IDECO_V28.claimId?IDECO_V28.claimId(c):'';
+      return id?(state.customerClaims||{})[id]||null:null;
+    }catch(_){return null}
+  }
+  function statusInfo(cl){
+    if(!cl)return {cls:'',text:'Chưa gửi Zalo'};
+    if(cl.status==='sent')return {cls:'sent',text:'ĐÃ GỬI · '+(cl.sentBy||cl.employeeName||'NV')};
+    if(cl.status==='holding')return {cls:'holding',text:'Đang phụ trách · '+(cl.employeeName||'NV')};
+    if(cl.status==='blocked')return {cls:'blocked',text:'Bị chặn / không thể nhắn'};
+    if(cl.status==='unavailable')return {cls:'unavailable',text:'Không tìm thấy / chưa kết bạn'};
+    return {cls:'',text:'Chưa gửi Zalo'};
+  }
+  function exposeGlobals(){
+    try{if(!window.database && typeof database!=='undefined')window.database=database}catch(_){ }
+    try{if(!window.ROOT && typeof ROOT!=='undefined')window.ROOT=ROOT}catch(_){ }
+  }
+  function movePreviewOutOfHiddenParent(){
+    const box=$('v23OnePasteBox'), panel=document.querySelector('.batch-panel');
+    if(!box||!panel)return false;
+    if(box.closest('#v22ManualSend')){
+      const anchor=panel.querySelector('.selected-list');
+      if(anchor)panel.insertBefore(box,anchor); else panel.prepend(box);
+    }
+    return true;
+  }
+  function buildTools(){
+    const panel=document.querySelector('.batch-panel'); if(!panel||$('v40SendTools'))return false;
+    const box=document.createElement('div');box.id='v40SendTools';
+    box.innerHTML=`<div class="v40-title">🧰 CÔNG CỤ GỬI ZALO — HIỂN THỊ ĐẦY ĐỦ</div>
+      <div class="v40-grid">
+        <button type="button" class="image" id="v40ChooseImage">🖼 Chọn ảnh từ máy</button>
+        <button type="button" class="preview" id="v40Preview">👁 Preview ảnh + thư</button>
+        <button type="button" class="custom" id="v40Customize">🎨 Chỉnh kích thước ảnh + chữ</button>
+        <button type="button" class="ai" id="v40AI">🤖 AI xưng hô</button>
+      </div>
+      <div id="v40EmployeeStatus">Nhân viên gửi: <b>—</b><span id="v40CurrentStatus">Chưa chọn khách</span></div>`;
+    const anchor=panel.querySelector('.selected-list');
+    if(anchor)panel.insertBefore(box,anchor); else panel.prepend(box);
+    $('v40ChooseImage').addEventListener('click',()=>{const b=$('chooseImageBtn');if(b)b.click();else $('mainImageUpload')?.click()});
+    $('v40Preview').addEventListener('click',()=>{
+      const c=currentSelected();
+      if(!c){try{toast('Chọn khách hàng trước để preview.')}catch(_){alert('Chọn khách hàng trước để preview.')}return}
+      if(window.IDECO_V26&&typeof IDECO_V26.preview==='function')return IDECO_V26.preview();
+      if(window.IDECO_V23&&typeof IDECO_V23.previewCard==='function')return IDECO_V23.previewCard(c);
+      $('v23PreviewCard')?.click();
+    });
+    $('v40Customize').addEventListener('click',()=>{
+      document.body.classList.toggle('v40-show-customize');
+      document.body.classList.toggle('v36-show-customize',document.body.classList.contains('v40-show-customize'));
+      movePreviewOutOfHiddenParent();
+      const p=$('v26Customize')||$('v23OnePasteBox');if(p)p.scrollIntoView({behavior:'smooth',block:'center'});
+    });
+    $('v40AI').addEventListener('click',()=>{
+      const c=currentSelected();if(!c){try{toast('Chọn khách hàng trước.')}catch(_){alert('Chọn khách hàng trước.')}return}
+      const b=$('aiAnalyzeMessage')||$('v25AiSalute');if(b)return b.click();
+      if(typeof aiAnalyzeCustomers==='function')return aiAnalyzeCustomers([c],true);
+    });
+    return true;
+  }
+  function updateStatus(){
+    const el=$('v40EmployeeStatus');if(!el)return;
+    let emp='—';try{emp=String(state.operator&&state.operator.employeeName||'—')}catch(_){ }
+    const c=currentSelected(),cl=claimFor(c),si=statusInfo(cl),st=$('v40CurrentStatus');
+    el.childNodes[1] && (el.childNodes[1].textContent='');
+    el.querySelector('b').textContent=emp;
+    if(st){st.className=si.cls;st.id='v40CurrentStatus';st.textContent=c?si.text:'Chưa chọn khách';}
+    if(c){
+      let extra=el.querySelector('.v40-customer');
+      if(!extra){extra=document.createElement('span');extra.className='v40-customer';extra.style.marginLeft='8px';el.appendChild(extra)}
+      extra.textContent='· '+(c.tenKhachHang||'Khách hàng');
+    }else el.querySelector('.v40-customer')?.remove();
+  }
+  function syncAdvancedToggle(){
+    const panel=document.querySelector('.batch-panel'),btn=$('mobileSendAdvancedToggle');if(!panel||!btn)return;
+    panel.classList.remove('mobile-advanced-hidden');
+    btn.textContent='⚙️ Thu gọn / mở mẫu thư & tùy chọn';
+  }
+  function install(){
+    exposeGlobals();
+    const panel=document.querySelector('.batch-panel');if(!panel)return setTimeout(install,200);
+    movePreviewOutOfHiddenParent();buildTools();syncAdvancedToggle();updateStatus();
+    // V35 trước đây chờ window.database/window.ROOT; expose xong thì gọi lại khởi tạo nếu cần.
+    try{if(!$('v35SimpleSend')&&window.IDECO_V35&&typeof IDECO_V35.renderPanel==='function'){/* object có nhưng box chưa có: để script nội bộ tự retry sau expose */}}catch(_){ }
+    const list=$('selectedList');if(list)new MutationObserver(()=>setTimeout(updateStatus,0)).observe(list,{childList:true,subtree:true});
+    const badge=$('selectedBadge');if(badge)new MutationObserver(()=>setTimeout(updateStatus,0)).observe(badge,{childList:true,subtree:true,characterData:true});
+    try{database.ref(ROOT+'/customerClaims').on('value',()=>setTimeout(updateStatus,0))}catch(_){ }
+    $('operatorName')?.addEventListener('change',()=>setTimeout(updateStatus,0));
+    // Sau khi các script động tạo v23/v26, tiếp tục kéo chúng ra khỏi parent bị ẩn.
+    let n=0;const t=setInterval(()=>{n++;movePreviewOutOfHiddenParent();if($('v26Customize')&&$('v23OnePasteBox')&&n>8)clearInterval(t);if(n>40)clearInterval(t)},180);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,220));else setTimeout(install,220);
+})();
+</script>
+
+
+<!-- ===== V41: TAB KHÁCH HÀNG HỢP TÁC + QUẢN LÝ TRONG CÀI ĐẶT ===== -->
+<style id="ideco-v41-partner-style">
+#v41CustomerTabs{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid #f1e3e3;background:linear-gradient(180deg,#fff,#fffafa)}
+.v41-tab{border:1px solid #d1d5db;background:#fff;color:#475569;border-radius:999px;padding:9px 14px;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+.v41-tab.active{background:#b91c1c;color:#fff;border-color:#b91c1c;box-shadow:0 4px 14px rgba(185,28,28,.16)}
+.v41-tab-count{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:rgba(148,163,184,.16);font-size:11px;font-weight:950}
+.v41-tab.active .v41-tab-count{background:rgba(255,255,255,.2)}
+.v41-partner-badge{display:inline-flex;align-items:center;margin-left:7px;padding:3px 7px;border-radius:999px;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;font-size:10px;font-weight:950;vertical-align:middle}
+#v41ModeNote{margin-left:auto;font-size:11.5px;font-weight:750;color:#64748b}
+.v41-partner-admin-grid{display:grid;grid-template-columns:minmax(240px,1fr) auto;gap:8px;align-items:end}
+.v41-partner-bulk{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;margin-top:10px}
+#v41PartnerBulk{min-height:92px;width:100%;resize:vertical;border:1px solid #d1d5db;border-radius:10px;padding:10px;font:inherit;line-height:1.45}
+.v41-partner-list{margin-top:12px;border:1px solid #e5e7eb;border-radius:10px;overflow:auto;max-height:320px;background:#fff}
+.v41-partner-row{display:grid;grid-template-columns:34px minmax(220px,1fr) 125px 80px;gap:8px;align-items:center;padding:9px 10px;border-bottom:1px solid #eef2f7;font-size:12px}
+.v41-partner-row:last-child{border-bottom:0}.v41-partner-name{font-weight:900;color:#0f172a;overflow-wrap:anywhere}
+.v41-match{font-size:10.5px;font-weight:900;padding:3px 7px;border-radius:999px;display:inline-flex;width:max-content}.v41-match.ok{background:#dcfce7;color:#166534;border:1px solid #86efac}.v41-match.miss{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
+.v41-del{border:0;border-radius:7px;padding:6px 8px;background:#fee2e2;color:#b91c1c;font-weight:900;cursor:pointer}
+.v41-partner-summary{margin-top:9px;padding:9px 10px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0;color:#475569;font-size:12px;line-height:1.5}
+@media(max-width:700px){#v41CustomerTabs{display:grid;grid-template-columns:1fr 1fr;padding:8px}.v41-tab{justify-content:center;padding:10px 8px}.v41-tab span.label{font-size:12px}#v41ModeNote{grid-column:1/-1;margin-left:0;text-align:center}.v41-partner-admin-grid,.v41-partner-bulk{grid-template-columns:1fr}.v41-partner-admin-grid .btn,.v41-partner-bulk .btn{width:100%}.v41-partner-row{grid-template-columns:28px 1fr 72px}.v41-partner-row .v41-match{grid-column:2}.v41-partner-row .v41-del{grid-column:3;grid-row:1/3}}
+</style>
+
+<!-- ===== V42: TAB KHÁCH HÀNG HỢP TÁC HIỂN THỊ RÕ NGAY TRÊN BẢNG ===== -->
+<style id="ideco-v42-visible-tabs">
+#v41CustomerTabs{order:0!important;position:relative!important;z-index:5!important;display:flex!important;min-height:52px!important}
+#v41CustomerTabs .v41-tab{font-size:14px!important;min-height:40px!important}
+#v41TabPartner{border-color:#7c3aed!important}
+#v41TabPartner:not(.active){background:#faf5ff!important;color:#6d28d9!important}
+#v41ModeNote{font-weight:850!important}
+@media(max-width:700px){#v41CustomerTabs{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important}.v41-tab{width:100%!important}.v41-tab .label{white-space:nowrap}}
+</style>
+<script id="ideco-v41-partner-js">
+(function(){
+  'use strict';
+  const MODE_LS='ideco_customer_view_mode_v41';
+  const PARTNER_PATH=ROOT+'/partnerCustomers';
+  let mode=localStorage.getItem(MODE_LS)==='partner'?'partner':'development';
+  let partnerRecords={};
+  const $v=id=>document.getElementById(id);
+  const esc41=s=>String(s==null?'':s).replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+  const norm41=s=>typeof norm==='function'?norm(s):String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+  function hashName(name){
+    const s=norm41(name);let h1=2166136261>>>0,h2=0x9e3779b9>>>0;
+    for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);h1^=c;h1=Math.imul(h1,16777619)>>>0;h2^=(c+i);h2=Math.imul(h2,2246822519)>>>0}
+    return 'p_'+h1.toString(16).padStart(8,'0')+h2.toString(16).padStart(8,'0');
+  }
+  function partnerNormSet(){return new Set(Object.values(partnerRecords||{}).map(r=>norm41(r&&r.name||r&&r.normalizedName||'')).filter(Boolean))}
+  function isPartner(c){return c&&c._source==='partnerExcel'}
+  function partnerCustomers(){return state.partnerCustomers||[]}
+  function developmentCustomers(){return state.developmentCustomers||[]}
+  function currentBase(){return mode==='partner'?partnerCustomers():developmentCustomers()}
+  function clearSelectionForMode(){
+    state.selected.clear();
+    if(typeof resetStaleCurrentCustomer==='function')resetStaleCurrentCustomer();
+    if(typeof updateSelectedUI==='function')updateSelectedUI();
+  }
+  function setMode(next){
+    next=next==='partner'?'partner':'development';
+    if(next!==mode && (state.batch.running||state.batch.busy)){
+      toast('Vui lòng hoàn tất hoặc dừng lượt gửi hiện tại trước khi đổi nhóm khách hàng.',4500);return;
+    }
+    if(next!==mode)clearSelectionForMode();
+    mode=next;localStorage.setItem(MODE_LS,mode);applyCustomerSource();syncTabs();
+    if(typeof renderCustomers==='function')renderCustomers();
+    if(typeof updateSelectedUI==='function')updateSelectedUI();
+    setTimeout(postRender,30);
+  }
+  function ensureTabs(){
+    const card=document.querySelector('.table-card');if(!card||$v('v41CustomerTabs'))return false;
+    const tabs=document.createElement('div');tabs.id='v41CustomerTabs';
+    tabs.innerHTML=`<button type="button" class="v41-tab" id="v41TabDevelopment"><span>🎯</span><span class="label">Khách hàng mới khai thác</span><span class="v41-tab-count" id="v41CountDevelopment">0</span></button><button type="button" class="v41-tab" id="v41TabPartner"><span>🤝</span><span class="label">Khách hàng hợp tác</span><span class="v41-tab-count" id="v41CountPartner">0</span></button><span id="v41ModeNote"></span>`;
+    const toolbar=card.querySelector('.toolbar');card.insertBefore(tabs,toolbar);
+    $v('v41TabDevelopment').addEventListener('click',()=>setMode('development'));
+    $v('v41TabPartner').addEventListener('click',()=>setMode('partner'));
+    syncTabs();return true;
+  }
+  function syncTabs(){
+    $v('v41TabDevelopment')?.classList.toggle('active',mode==='development');
+    $v('v41TabPartner')?.classList.toggle('active',mode==='partner');
+    const pc=partnerCustomers().length,dc=developmentCustomers().length;
+    if($v('v41CountPartner'))$v('v41CountPartner').textContent=String(pc);
+    if($v('v41CountDevelopment'))$v('v41CountDevelopment').textContent=String(dc);
+    if($v('v41ModeNote'))$v('v41ModeNote').textContent=mode==='partner'?'Nguồn riêng: Excel khách hàng hợp tác':'Nguồn riêng: Excel khách hàng mới khai thác';
+  }
+  function overrideFilter(){
+    window.filteredCustomers=function(){
+      const q=norm41($v('searchInput')?.value||'');
+      const base=currentBase();
+      if(!q)return base;
+      return base.filter(c=>norm41([c.tenKhachHang,c.nguoiLienHe,c.dienThoai,c.diaChi,c.nhanVien].join(' ')).includes(q));
+    };
+  }
+  function postRender(){
+    syncTabs();
+    const list=window.filteredCustomers?window.filteredCustomers():currentBase();
+    if($v('customerCount'))$v('customerCount').textContent=list.length+(mode==='partner'?' khách hợp tác':' khách mới khai thác');
+    document.querySelectorAll('#customerBody tr[data-key]').forEach(tr=>{
+      tr.querySelectorAll('.v41-partner-badge').forEach(x=>x.remove());
+      if(mode!=='partner')return;
+      const name=tr.querySelector('.customer-name');if(name){const b=document.createElement('span');b.className='v41-partner-badge';b.textContent='🤝 HỢP TÁC';name.appendChild(b)}
+    });
+    if(mode==='partner' && !list.length){
+      const body=$v('customerBody');if(body)body.innerHTML='<tr><td colspan="8" class="empty">Chưa có khách hàng hợp tác trong nguồn này. Vào Cài đặt → Upload Excel khách hàng hợp tác → Lưu.</td></tr>';
+    }
+  }
+  function wrapRender(){
+    if(typeof renderCustomers!=='function'||renderCustomers.__v41wrapped)return;
+    const old=renderCustomers;
+    window.renderCustomers=function(){const r=old.apply(this,arguments);setTimeout(postRender,0);return r};
+    window.renderCustomers.__v41wrapped=true;
+  }
+  function matched(name){const n=norm41(name);return (state.customers||[]).some(c=>norm41(c.tenKhachHang)===n)}
+  function customerOptions(){
+    const dl=$v('v41PartnerDatalist');if(!dl)return;
+    dl.innerHTML=(state.customers||[]).slice().sort((a,b)=>String(a.tenKhachHang||'').localeCompare(String(b.tenKhachHang||''),'vi')).map(c=>`<option value="${esc41(c.tenKhachHang||'')}"></option>`).join('');
+  }
+  function renderPartnerAdmin(){
+    customerOptions();
+    const box=$v('v41PartnerList');if(!box)return;
+    const rows=Object.entries(partnerRecords||{}).sort((a,b)=>String(a[1]?.name||'').localeCompare(String(b[1]?.name||''),'vi'));
+    if(!rows.length){box.innerHTML='<div class="empty" style="padding:14px">Chưa khai báo khách hàng hợp tác.</div>';}
+    else box.innerHTML=rows.map(([id,r],i)=>`<div class="v41-partner-row"><b>${i+1}</b><div class="v41-partner-name">${esc41(r.name||'')}</div><span class="v41-match ${matched(r.name)?'ok':'miss'}">${matched(r.name)?'✓ Có trong dữ liệu':'⚠ Chưa khớp'}</span><button type="button" class="v41-del" data-v41-del="${esc41(id)}">Xóa</button></div>`).join('');
+    const hit=rows.filter(([,r])=>matched(r.name)).length;
+    if($v('v41PartnerSummary'))$v('v41PartnerSummary').innerHTML=`Đã lưu <b>${rows.length}</b> khách hợp tác · khớp dữ liệu hiện tại <b>${hit}</b> · chưa khớp <b>${rows.length-hit}</b>. Tên được so khớp không phân biệt hoa/thường và dấu tiếng Việt.`;
+    syncTabs();
+  }
+  async function savePartnerName(name){
+    name=String(name||'').trim();if(!name)return false;
+    const id=hashName(name);
+    await database.ref(PARTNER_PATH+'/'+id).set({name,normalizedName:norm41(name),updatedAt:firebase.database.ServerValue.TIMESTAMP});return true;
+  }
+  async function addOne(){
+    const inp=$v('v41PartnerName');const name=inp?.value.trim();if(!name){if(typeof toast==='function')toast('Nhập tên khách hàng hợp tác trước.');return}
+    try{await savePartnerName(name);if(inp)inp.value='';if(typeof toast==='function')toast('🤝 Đã lưu khách hàng hợp tác lên Firebase.');}catch(e){if(typeof toast==='function')toast('❌ Không lưu được: '+esc41(e&&e.message||e),5500)}
+  }
+  async function addBulk(){
+    const ta=$v('v41PartnerBulk');const names=[...new Set(String(ta?.value||'').split(/\r?\n|;/).map(s=>s.trim()).filter(Boolean))];if(!names.length){if(typeof toast==='function')toast('Dán danh sách tên khách hàng, mỗi dòng một tên.');return}
+    try{const updates={};for(const name of names){updates[hashName(name)]={name,normalizedName:norm41(name),updatedAt:firebase.database.ServerValue.TIMESTAMP}}await database.ref(PARTNER_PATH).update(updates);if(ta)ta.value='';if(typeof toast==='function')toast('🤝 Đã thêm '+names.length+' khách hàng hợp tác.',4000)}catch(e){if(typeof toast==='function')toast('❌ Không lưu được danh sách: '+esc41(e&&e.message||e),5500)}
+  }
+  async function deleteOne(id){try{await database.ref(PARTNER_PATH+'/'+id).remove();if(typeof toast==='function')toast('🗑 Đã bỏ khách khỏi nhóm hợp tác.')}catch(e){if(typeof toast==='function')toast('❌ Không xóa được: '+esc41(e&&e.message||e),5500)}}
+  async function deleteAll(){if(!confirm('Xóa toàn bộ danh sách khách hàng hợp tác đã lưu?'))return;try{await database.ref(PARTNER_PATH).remove();if(typeof toast==='function')toast('🗑 Đã xóa toàn bộ danh sách khách hàng hợp tác.')}catch(e){if(typeof toast==='function')toast('❌ Không xóa được: '+esc41(e&&e.message||e),5500)}}
+  function ensureSettingsCard(){
+    const grid=document.querySelector('#settingsContent .settings-grid');if(!grid||$v('v41PartnerSettings'))return false;
+    const sec=document.createElement('section');sec.className='setting-card';sec.id='v41PartnerSettings';sec.style.gridColumn='1/-1';
+    grid.appendChild(sec);return true;
+  }
+  function listenFirebase(){
+    database.ref(PARTNER_PATH).on('value',snap=>{partnerRecords=snap.val()||{};renderPartnerAdmin();if(typeof renderCustomers==='function')renderCustomers();setTimeout(postRender,30)},err=>{console.warn('V41 partner listener',err)});
+  }
+  function install(){
+    if(typeof state==='undefined'||typeof database==='undefined'||typeof ROOT==='undefined'||!document.querySelector('.table-card'))return setTimeout(install,250);
+    ensureTabs();applyCustomerSource();overrideFilter();wrapRender();ensureSettingsCard();
+    const s=$v('searchInput');if(s&&!s.__v41){s.__v41=true;s.addEventListener('input',()=>setTimeout(postRender,0))}
+    postRender();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,220));else setTimeout(install,220);
+  window.IDECO_V41={setMode,getMode:()=>mode,isPartner,partnerCustomers,developmentCustomers};
+})();
+</script>
+
+
+<!-- ===== V43: EXCEL KHÁCH HÀNG HỢP TÁC - NHÁNH FIREBASE RIÊNG / SOI CHIẾU / CHỐNG TRÙNG ===== -->
+<style id="ideco-v43-partner-excel-style">
+.v43-partner-excel{margin-top:14px;border:1px solid #ddd6fe;border-radius:14px;overflow:hidden;background:#fff}
+.v43-partner-excel .v43-head{padding:11px 13px;background:linear-gradient(90deg,#faf5ff,#f5f3ff);border-bottom:1px solid #ddd6fe;font-weight:950;color:#5b21b6}
+.v43-partner-excel .v43-body{padding:13px}
+.v43-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:11px}
+.v43-grid .field{margin:0}.v43-file-panel{margin-top:11px;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden}.v43-file-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;background:#f8fafc;font-weight:850;color:#334155}.v43-file-list{max-height:250px;overflow:auto}.v43-file-item{display:grid;grid-template-columns:minmax(180px,1.5fr) 90px 145px 150px;gap:8px;align-items:center;padding:9px 11px;border-top:1px solid #eef2f7;font-size:12px}.v43-file-item.active{background:#eff6ff;box-shadow:inset 4px 0 #7c3aed}.v43-file-item.pending{background:#fffbeb}.v43-file-name{font-weight:900;overflow-wrap:anywhere}.v43-file-meta{color:#64748b;margin-top:2px}.v43-file-actions{display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap}.v43-file-actions button{border:0;border-radius:7px;padding:6px 8px;font-size:11px;font-weight:900;cursor:pointer}.v43-map{background:#ede9fe;color:#6d28d9}.v43-del{background:#fee2e2;color:#b91c1c}.v43-save{background:#dcfce7;color:#166534}.v43-summary{margin-top:10px;padding:9px 10px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0;color:#475569;font-size:12px;line-height:1.5}.v43-dedupe-note{margin-top:9px;padding:9px 10px;border-radius:9px;background:#ecfdf5;border:1px solid #a7f3d0;color:#166534;font-size:12px;line-height:1.5}.v43-badge{display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;background:#f3e8ff;color:#6d28d9;border:1px solid #ddd6fe;font-size:10px;font-weight:950;margin-left:6px}
+@media(max-width:700px){.v43-grid{grid-template-columns:1fr}.v43-file-item{grid-template-columns:1fr 80px}.v43-file-actions{grid-column:1/-1;justify-content:flex-start}.v43-file-actions button{min-height:38px}}
+</style>
+<script id="ideco-v43-partner-excel-js">
+(function(){
+  'use strict';
+  const PARTNER_FILE_PATH=ROOT+'/partnerCustomerFiles';
+  const PARTNER_EXCEL_STATE={pending:[],activeId:'',aoa:null,name:'',rows:[],files:[],ready:false,error:''};
+  const $=id=>document.getElementById(id);
+  const esc43=s=>String(s==null?'':s).replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+  const norm43=s=>typeof norm==='function'?norm(s):String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+  function fileRows43(v){return Object.values(v&&v.rows||{}).filter(Boolean).map(c=>({tenKhachHang:c.tenKhachHang||'',nguoiLienHe:c.nguoiLienHe||'',dienThoai:c.dienThoai||'',diaChi:c.diaChi||'',nhanVien:c.nhanVien||'',_source:'partnerExcel',_partnerFileId:v.id||''}));}
+  function allPartnerRows(){
+    const rows=[];for(const f of PARTNER_EXCEL_STATE.files||[]) rows.push(...fileRows43(f));
+    const m=new Map();for(const c of rows){const k=customerKey(c);if(!k||k==='p:|n:|lh:|a:')continue;if(!m.has(k))m.set(k,c);else if(!m.get(k).nhanVien&&c.nhanVien)m.get(k).nhanVien=c.nhanVien;}return [...m.values()];
+  }
+  function partnerUploadedKeys(){return new Set(allPartnerRows().map(customerKey));}
+  function syncPartnerIntoCustomers(){
+    state.partnerCustomers=allPartnerRows();
+    applyCustomerSource();
+    if(typeof updateSelectedUI==='function')updateSelectedUI();
+  }
+  function refreshPartnerView(){
+    syncPartnerIntoCustomers();
+    if(typeof renderCustomers==='function')renderCustomers();
+    setTimeout(()=>{
+      const v=window.IDECO_V41;
+      if(v&&v.getMode&&v.getMode()==='partner'){
+        const n=(window.filteredCustomers?window.filteredCustomers():[]).length;
+        if($('v41CountPartner'))$('v41CountPartner').textContent=String(allPartnerRows().length);
+        if($('customerCount'))$('customerCount').textContent=n+' khách hợp tác';
+      }
+      renderSavedPartnerFiles();
+    },30);
+  }
+  function firstRow43(aoa){return typeof firstNonEmptyRow==='function'?firstNonEmptyRow(aoa):0}
+  function loadHeaders43(){
+    if(!PARTNER_EXCEL_STATE.aoa)return;
+    let hr=Math.max(1,Number($('v43HeaderRow').value)||1)-1;if(hr>=PARTNER_EXCEL_STATE.aoa.length)hr=0;
+    const headers=(PARTNER_EXCEL_STATE.aoa[hr]||[]).map((v,i)=>String(v??'').trim()||('Cột '+(i+1)));
+    headerOptions(headers,$('v43MapName'),'name');headerOptions(headers,$('v43MapContact'),'contact');headerOptions(headers,$('v43MapPhone'),'phone');headerOptions(headers,$('v43MapAddress'),'address');headerOptions(headers,$('v43MapStaff'),'staff');
+    $('v43Preview').disabled=false;
+    $('v43Summary').innerHTML=`File đang soi chiếu: <b>${esc43(PARTNER_EXCEL_STATE.name)}</b> · ${PARTNER_EXCEL_STATE.aoa.length} dòng · dòng tiêu đề ${hr+1}.`;
+    const f=PARTNER_EXCEL_STATE.pending.find(x=>x.id===PARTNER_EXCEL_STATE.activeId);if(f)f.headerRow=hr+1;
+  }
+  function buildRows43(){
+    const aoa=PARTNER_EXCEL_STATE.aoa;if(!aoa)return[];const hr=Math.max(1,Number($('v43HeaderRow').value)||1)-1;
+    const idx={tenKhachHang:Number($('v43MapName').value),nguoiLienHe:Number($('v43MapContact').value),dienThoai:Number($('v43MapPhone').value),diaChi:Number($('v43MapAddress').value),nhanVien:Number($('v43MapStaff').value)};
+    if(idx.tenKhachHang<0)throw new Error('Cần chọn cột Tên khách hàng.');
+    const get=(r,i)=>i>=0?String((r||[])[i]??'').trim():'';
+    const raw=aoa.slice(hr+1).map(r=>({tenKhachHang:get(r,idx.tenKhachHang),nguoiLienHe:get(r,idx.nguoiLienHe),dienThoai:get(r,idx.dienThoai),diaChi:get(r,idx.diaChi),nhanVien:get(r,idx.nhanVien)})).filter(c=>c.tenKhachHang);
+    const before=raw.length;const unique=dedupe(raw);return {rows:unique,before,duplicatesRemoved:before-unique.length};
+  }
+  function preview43(){
+    try{
+      const x=buildRows43();PARTNER_EXCEL_STATE.rows=x.rows;$('v43Save').disabled=!x.rows.length;
+      const sample=x.rows.slice(0,10);const valid=x.rows.filter(c=>localMobilePhone(c.dienThoai)).length;
+      $('v43PreviewBox').innerHTML=`<table><thead><tr><th>Tên khách hàng</th><th>Người liên hệ</th><th>Điện thoại</th><th>Địa chỉ</th><th>Nhân viên</th></tr></thead><tbody>${sample.map(c=>`<tr><td>${esc43(c.tenKhachHang)}</td><td>${esc43(c.nguoiLienHe)}</td><td>${esc43(c.dienThoai)}</td><td>${esc43(c.diaChi)}</td><td>${esc43(c.nhanVien)}</td></tr>`).join('')}</tbody></table>`;
+      $('v43Summary').innerHTML=`✅ Đã chuẩn hóa <b>${x.rows.length}</b> khách · loại <b>${x.duplicatesRemoved}</b> dòng trùng trong file · <b>${valid}</b> SĐT di động hợp lệ. <b>${x.rows.filter(c=>c.nhanVien).length}</b> khách có nhân viên phụ trách. Các dòng thiếu/sai SĐT vẫn được lưu nhưng sẽ không chọn gửi Zalo.`;
+      $('v43Status').textContent='Đã xem trước dữ liệu. Kiểm tra cột rồi bấm Lưu.';
+    }catch(e){PARTNER_EXCEL_STATE.rows=[];$('v43Save').disabled=true;$('v43Status').textContent='❌ '+(e.message||e)}
+  }
+  async function read43(file){return typeof readExcel==='function'?readExcel(file):[]}
+  function renderPending43(){
+    const box=$('v43Pending');if(!box)return;$('v43PendingCount').textContent=PARTNER_EXCEL_STATE.pending.length+' file';
+    if(!PARTNER_EXCEL_STATE.pending.length){box.innerHTML='<div class="empty" style="padding:12px">Chưa chọn file.</div>';return;}
+    box.innerHTML=PARTNER_EXCEL_STATE.pending.map(f=>`<div class="v43-file-item pending ${f.id===PARTNER_EXCEL_STATE.activeId?'active':''}"><div><div class="v43-file-name">${esc43(f.name)}</div><div class="v43-file-meta">${f.aoa?.length||0} dòng đọc được</div></div><div>${Math.round((f.size||0)/1024)} KB</div><div>${f.saved?'✅ Đã lưu':'⏳ Chờ soi chiếu'}</div><div class="v43-file-actions"><button class="v43-map" data-v43-map="${esc43(f.id)}">🔎 Soi chiếu</button><button class="v43-del" data-v43-pdel="${esc43(f.id)}">✕ Bỏ</button></div></div>`).join('');
+  }
+  async function add43(files){
+    const arr=Array.from(files||[]);if(!arr.length)return;$('v43Status').textContent=`Đang đọc ${arr.length} file Excel…`;
+    for(const file of arr){try{const aoa=await read43(file);const id='pp'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);PARTNER_EXCEL_STATE.pending.push({id,name:file.name,size:file.size,lastModified:file.lastModified,aoa,headerRow:firstRow43(aoa)+1,saved:false});}catch(e){toast('❌ Không đọc được '+file.name+': '+(e.message||e),6500)}}
+    renderPending43();if(!PARTNER_EXCEL_STATE.activeId&&PARTNER_EXCEL_STATE.pending.length)activate43(PARTNER_EXCEL_STATE.pending[0].id);$('v43Status').textContent=`✅ Đã đọc ${PARTNER_EXCEL_STATE.pending.length} file đang chờ.`;
+  }
+  function activate43(id){const f=PARTNER_EXCEL_STATE.pending.find(x=>x.id===id);if(!f)return;PARTNER_EXCEL_STATE.activeId=id;PARTNER_EXCEL_STATE.aoa=f.aoa;PARTNER_EXCEL_STATE.name=f.name;PARTNER_EXCEL_STATE.rows=[];$('v43HeaderRow').value=f.headerRow||1;$('v43Reload').disabled=false;$('v43Preview').disabled=false;$('v43Save').disabled=true;$('v43PreviewBox').innerHTML='';$('v43Status').textContent='Đang soi chiếu '+f.name;loadHeaders43();preview43();renderPending43();}
+  function renderSavedPartnerFiles(){
+    const box=$('v43Saved');if(!box)return;$('v43SavedCount').textContent=PARTNER_EXCEL_STATE.files.length+' file';
+    if(!PARTNER_EXCEL_STATE.files.length){box.innerHTML='<div class="empty" style="padding:12px">Chưa có file Excel khách hàng hợp tác.</div>';if($('v43SavedSummary'))$('v43SavedSummary').textContent='0 file · 0 khách hợp tác';return;}
+    box.innerHTML=PARTNER_EXCEL_STATE.files.slice().sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0)).map(f=>`<div class="v43-file-item"><div><div class="v43-file-name">${esc43(f.name||'Nguồn hợp tác')}</div><div class="v43-file-meta">${esc43(f.uploadedBy||'')} ${f.department?'· '+esc43(f.department):''}</div></div><div><b>${Number(f.rowCount||fileRows43(f).length)}</b> khách</div><div>${f.uploadedAt?timeStr(f.uploadedAt):''}</div><div class="v43-file-actions"><button class="v43-del" data-v43-sdel="${esc43(f.id)}">🗑 Xóa file</button></div></div>`).join('');
+    $('v43SavedSummary')?.replaceChildren(document.createTextNode(`☁️ Firebase riêng: ${PARTNER_EXCEL_STATE.files.length} file · ${allPartnerRows().length} khách hợp tác duy nhất sau khi chống trùng.`));
+  }
+  async function save43(){
+    try{
+      if(!PARTNER_EXCEL_STATE.ready)throw new Error(PARTNER_EXCEL_STATE.error||'Nguồn khách hợp tác chưa tải xong. Vui lòng chờ kết nối rồi lưu lại.');
+      const x=buildRows43();PARTNER_EXCEL_STATE.rows=x.rows;if(!x.rows.length)return;
+      // Chống trùng toàn hệ thống hợp tác: nếu khách đã tồn tại ở file khác, không ghi thêm dòng trùng vào file mới.
+      const existing=new Set(allPartnerRows().map(customerKey));
+      const uniqueNew=x.rows.filter(c=>!existing.has(customerKey(c)));
+      const duplicateExisting=x.rows.length-uniqueNew.length;
+      // Cập nhật nhân viên của khách trùng, không tạo thêm khách và không xóa tên bằng ô trống.
+      const incoming=new Map(x.rows.filter(c=>c.nhanVien).map(c=>[customerKey(c),c.nhanVien]));
+      const updates={},changedKeys=new Set();
+      for(const f of PARTNER_EXCEL_STATE.files){for(const [rowId,c] of Object.entries(f.rows||{})){
+        if(!c)continue;const k=customerKey(c),staff=incoming.get(k);
+        if(staff&&staff!==c.nhanVien){updates[f.id+'/rows/'+rowId+'/nhanVien']=staff;changedKeys.add(k);}
+      }}
+      const map={name:Number($('v43MapName').value),contact:Number($('v43MapContact').value),phone:Number($('v43MapPhone').value),address:Number($('v43MapAddress').value),staff:Number($('v43MapStaff').value)};
+      const ref=database.ref(PARTNER_FILE_PATH).push();
+      const rec={name:PARTNER_EXCEL_STATE.name||'Excel khách hàng hợp tác',rowCount:uniqueNew.length,duplicateSkipped:duplicateExisting,uploadedAt:Date.now(),uploadedBy:state.operator?.employeeName||'',department:state.operator?.department||'',headerRow:Math.max(1,Number($('v43HeaderRow').value)||1),mapping:map,rows:rowsObject(uniqueNew),sourceType:'partnerExcel'};
+      $('v43Save').disabled=true;$('v43Status').textContent='Đang lưu khách hàng và cập nhật nhân viên…';
+      if(uniqueNew.length)updates[ref.key]=rec;
+      if(Object.keys(updates).length)await database.ref(PARTNER_FILE_PATH).update(updates);
+      window.IDECO_V41?.setMode('partner');
+      PARTNER_EXCEL_STATE.pending=PARTNER_EXCEL_STATE.pending.filter(x=>x.id!==PARTNER_EXCEL_STATE.activeId);PARTNER_EXCEL_STATE.activeId='';PARTNER_EXCEL_STATE.aoa=null;PARTNER_EXCEL_STATE.name='';PARTNER_EXCEL_STATE.rows=[];$('v43PreviewBox').innerHTML='';$('v43Preview').disabled=true;$('v43Reload').disabled=true;$('v43Save').disabled=true;$('v43Status').textContent=`✅ Đã lưu ${rec.rowCount} khách mới · cập nhật nhân viên ${changedKeys.size} khách đã tồn tại.`;renderPending43();if(PARTNER_EXCEL_STATE.pending.length)activate43(PARTNER_EXCEL_STATE.pending[0].id);toast(`🤝 Đã lưu ${rec.rowCount} khách hợp tác vào Firebase riêng. Cập nhật nhân viên ${changedKeys.size} khách trùng.`,5000);
+    }catch(e){$('v43Status').textContent='❌ Không lưu được: '+(e.message||e);$('v43Save').disabled=false}
+  }
+  async function delete43(id){const f=PARTNER_EXCEL_STATE.files.find(x=>x.id===id);if(!f)return;if(!confirm(`Xóa file hợp tác “${f.name||'file'}”? Dữ liệu của file này sẽ không còn trong tab Khách hàng hợp tác.`))return;try{await database.ref(PARTNER_FILE_PATH+'/'+id).remove();toast('🗑 Đã xóa file khách hàng hợp tác.');}catch(e){toast('❌ Không xóa được: '+(e.message||e),6000)}}
+  function ensureSettings43(){
+    if($('v43PartnerExcelSettings'))return true;
+    const host=$('v41PartnerSettings');if(!host)return false;
+    const sec=document.createElement('div');sec.className='v43-partner-excel';sec.id='v43PartnerExcelSettings';sec.innerHTML=`<div class="v43-head">📊 Upload Excel danh sách khách hàng hợp tác — nguồn Firebase riêng</div><div class="v43-body"><div class="security-note">Phần này hoạt động giống <b>Excel khách hàng mới</b>: chọn nhiều file → <b>Soi chiếu cột</b> → xem trước → lưu. Dữ liệu chỉ hiển thị ở tab <b>Khách hàng hợp tác</b>, độc lập với tab <b>Khách hàng mới khai thác</b>. Hệ thống tự <b>chống trùng trong file và giữa các file hợp tác</b> theo khóa khách hàng. Tải lại file sẽ cập nhật nhân viên cho khách trùng; ô nhân viên trống không xóa tên đã lưu. Với file ERP, kiểm tra mục Nhân viên phụ trách chọn <b>I — Nhân viên phụ trách</b>.</div><div class="inline" style="margin-top:10px"><input id="v43ExcelInput" type="file" accept=".xlsx,.xls" multiple><label class="small"><b>Dòng tiêu đề:</b> <input id="v43HeaderRow" type="number" min="1" value="1" style="width:72px;padding:7px;border:1px solid #ccc;border-radius:7px"></label><button class="btn btn-light" id="v43Reload" disabled>↻ Đọc lại tiêu đề</button></div><div class="v43-file-panel"><div class="v43-file-head"><span>📥 File đang chờ soi chiếu/lưu</span><span id="v43PendingCount">0 file</span></div><div class="v43-file-list" id="v43Pending"><div class="empty" style="padding:12px">Chưa chọn file.</div></div></div><div class="v43-grid"><div class="field"><label>Tên khách hàng *</label><select id="v43MapName"></select></div><div class="field"><label>Người liên hệ</label><select id="v43MapContact"></select></div><div class="field"><label>Điện thoại</label><select id="v43MapPhone"></select></div><div class="field"><label>Địa chỉ</label><select id="v43MapAddress"></select></div><div class="field"><label>Nhân viên phụ trách</label><select id="v43MapStaff"></select></div></div><div class="inline" style="margin-top:10px"><button class="btn btn-blue" id="v43Preview" disabled>👁 Xem trước dữ liệu</button><button class="btn btn-green" id="v43Save" disabled>💾 Lưu vào KHÁCH HÀNG HỢP TÁC</button><span class="small muted" id="v43Status"></span></div><div class="v43-summary" id="v43Summary">Chọn file Excel để bắt đầu soi chiếu.</div><div id="v43PreviewBox"></div><div class="v43-dedupe-note" id="v43SavedSummary">☁️ Firebase riêng: đang tải dữ liệu…</div><div class="v43-file-panel"><div class="v43-file-head"><span>☁️ File Excel hợp tác đã lưu</span><span id="v43SavedCount">0 file</span></div><div class="v43-file-list" id="v43Saved"><div class="empty" style="padding:12px">Đang tải…</div></div></div></div>`;
+    host.appendChild(sec);
+    $('v43ExcelInput').addEventListener('change',e=>{add43(e.target.files);e.target.value=''});
+    $('v43Pending').addEventListener('click',e=>{const m=e.target.closest('[data-v43-map]'),d=e.target.closest('[data-v43-pdel]');if(m)activate43(m.dataset.v43Map);if(d){const id=d.dataset.v43Pdel;PARTNER_EXCEL_STATE.pending=PARTNER_EXCEL_STATE.pending.filter(x=>x.id!==id);if(PARTNER_EXCEL_STATE.activeId===id){PARTNER_EXCEL_STATE.activeId='';PARTNER_EXCEL_STATE.aoa=null;PARTNER_EXCEL_STATE.name='';PARTNER_EXCEL_STATE.rows=[];$('v43PreviewBox').innerHTML='';$('v43Preview').disabled=true;$('v43Save').disabled=true;$('v43Reload').disabled=true;if(PARTNER_EXCEL_STATE.pending.length)activate43(PARTNER_EXCEL_STATE.pending[0].id)}renderPending43();}});
+    $('v43Saved').addEventListener('click',e=>{const d=e.target.closest('[data-v43-sdel]');if(d)delete43(d.dataset.v43Sdel)});
+    for(const id of ['v43MapName','v43MapContact','v43MapPhone','v43MapAddress','v43MapStaff'])$(id).addEventListener('change',preview43);
+    $('v43HeaderRow').addEventListener('change',()=>{loadHeaders43();preview43()});
+    $('v43Reload').addEventListener('click',()=>{loadHeaders43();preview43()});$('v43Preview').addEventListener('click',preview43);$('v43Save').addEventListener('click',save43);
+    renderSavedPartnerFiles();return true;
+  }
+  function listen43(){database.ref(PARTNER_FILE_PATH).on('value',snap=>{const v=snap.val()||{};PARTNER_EXCEL_STATE.files=Object.entries(v).map(([id,x])=>({id,...x}));PARTNER_EXCEL_STATE.ready=true;PARTNER_EXCEL_STATE.error='';syncPartnerIntoCustomers();refreshPartnerView();},err=>{PARTNER_EXCEL_STATE.ready=false;PARTNER_EXCEL_STATE.error='Không đọc được nguồn khách hợp tác: '+(err.message||err);if($('v43Status'))$('v43Status').textContent=PARTNER_EXCEL_STATE.error;if($('v41CountPartner'))$('v41CountPartner').textContent='Lỗi kết nối';toast(PARTNER_EXCEL_STATE.error,7000)});}
+  function patchPartnerFilter(){
+    window.filteredCustomers=function(){
+      const q=norm43($('searchInput')?.value||'');
+      const base=state.customers||[];
+      return !q?base:base.filter(c=>norm43([c.tenKhachHang,c.nguoiLienHe,c.dienThoai,c.diaChi,c.nhanVien].join(' ')).includes(q));
+    };
+  }
+  function install(){
+    if(typeof state==='undefined'||typeof database==='undefined'||!document.querySelector('.table-card'))return setTimeout(install,250);
+    if(!ensureSettings43())return setTimeout(install,100);patchPartnerFilter();listen43();
+    const s=$('searchInput');if(s&&!s.__v43){s.__v43=true;s.addEventListener('input',()=>setTimeout(refreshPartnerView,0))}
+    refreshPartnerView();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,300));else setTimeout(install,300);
+  window.IDECO_V43={state:PARTNER_EXCEL_STATE,allPartnerRows,partnerUploadedKeys,refreshPartnerView};
+})();
+</script>
+
+
+<style>
+#v45UploadSettings{grid-column:1/-1;border:2px solid #7c3aed;border-radius:14px;overflow:hidden;background:#fff}
+.v45-upload-tabs{display:flex;gap:8px;padding:14px;background:#f5f3ff;flex-wrap:wrap}
+.v45-upload-tabs button{flex:1;padding:12px;border:1px solid #cbd5e1;border-radius:9px;font-weight:800;background:white;cursor:pointer}
+.v45-upload-tabs button.active{background:#6d28d9;color:white}
+#v45UploadSettings [data-upload-panel][hidden]{display:none!important}
+#v45UploadSettings .setting-card{border:0;margin:0}#v45UploadSettings .v43-partner-excel{margin:0;border:0}
+#v45Destination{padding:10px 14px;font-weight:800;color:#5b21b6}
+</style>
+<script id="ideco-v45-upload-routing">
+(function(){
+  const byId=id=>document.getElementById(id);
+  let uploadMode='development';
+  function selectUpload(mode){
+    uploadMode=mode==='partner'?'partner':'development';
+    for(const m of ['development','partner']){
+      const panel=byId('v45Panel_'+m);if(panel)panel.hidden=m!==uploadMode;
+      byId('v45Upload_'+m)?.classList.toggle('active',m===uploadMode);
+    }
+    if(byId('v45Destination'))byId('v45Destination').textContent='Đích lưu: '+(uploadMode==='partner'?'KHÁCH HÀNG HỢP TÁC':'KHÁCH HÀNG MỚI KHAI THÁC');
+  }
+  async function moveToPartner(id,button){
+    if(!window.IDECO_V43?.state.ready){toast('Chưa kết nối được nguồn hợp tác. Vui lòng thử lại sau.',5000);return;}
+    const f=state.customerFiles.find(x=>x.id===id);if(!f)return;
+    if(!confirm('Chuyển toàn bộ file “'+f.name+'” từ KHÁCH MỚI sang KHÁCH HỢP TÁC? File sẽ rời danh sách khách mới và giữ nguyên dữ liệu, nhân viên phụ trách.'))return;
+    button.disabled=true;
+    try{
+      // One root-level update: the file cannot be removed unless the partner copy is saved.
+      const from=database.ref(ROOT+'/customerFiles/'+id),snap=await from.once('value');
+      const original=snap.val();if(!original)throw new Error('File đã thay đổi hoặc đã được chuyển. Hãy kiểm tra lại danh sách.');
+      const target=database.ref(ROOT+'/partnerCustomerFiles').push();
+      const updates={};updates['partnerCustomerFiles/'+target.key]={...original,sourceType:'partnerExcel',movedFrom:'customerFiles/'+id,movedAt:Date.now()};updates['customerFiles/'+id]=null;
+      await database.ref(ROOT).update(updates);
+      selectUpload('partner');window.IDECO_V41?.setMode('partner');
+      toast('Đã chuyển file sang KHÁCH HÀNG HỢP TÁC và bỏ khỏi KHÁCH HÀNG MỚI.',5500);
+    }catch(e){toast('Không chuyển được file: '+(e.message||e),6500)}finally{button.disabled=false;}
+  }
+  function addMoveButtons(){
+    byId('savedExcelFiles')?.querySelectorAll('[data-saved-del]').forEach(del=>{
+      const host=del.parentElement;if(host.querySelector('[data-move-partner]'))return;
+      const b=document.createElement('button');b.type='button';b.className='file-map-btn';b.dataset.movePartner=del.dataset.savedDel;b.textContent='↗ Chuyển sang hợp tác';host.prepend(b);
+    });
+  }
+  function install(){
+    const input=byId('excelInput'),partner=byId('v41PartnerSettings');
+    if(!input||!partner||!byId('v43ExcelInput'))return setTimeout(install,100);
+    const development=input.closest('section'),grid=development.parentElement;
+    const box=document.createElement('section');box.id='v45UploadSettings';
+    box.innerHTML='<div class="v45-upload-tabs"><button type="button" id="v45Upload_development">🎯 Upload KHÁCH HÀNG MỚI</button><button type="button" id="v45Upload_partner">🤝 Upload KHÁCH HÀNG HỢP TÁC</button></div><div id="v45Destination"></div>';
+    grid.insertBefore(box,development);development.id='v45Panel_development';development.dataset.uploadPanel='development';
+    // Keep the original partner host ID; wrap it so the uploader can still find its host.
+    const wrap=document.createElement('div');wrap.id='v45Panel_partner';wrap.dataset.uploadPanel='partner';wrap.appendChild(partner);box.append(development,wrap);
+    for(const mode of ['development','partner'])byId('v45Upload_'+mode).addEventListener('click',()=>selectUpload(mode));
+    const oldOpen=openSettings;window.openSettings=function(){selectUpload(window.IDECO_V41?.getMode());return oldOpen.apply(this,arguments)};
+    byId('settingsBtn').addEventListener('click',()=>selectUpload(window.IDECO_V41?.getMode()),true);
+    const tabs=byId('v41CustomerTabs');const upload=document.createElement('button');upload.type='button';upload.className='btn btn-blue';upload.textContent='📥 Upload Excel vào tab này';upload.addEventListener('click',()=>{selectUpload(window.IDECO_V41?.getMode());openSettings()});tabs.appendChild(upload);
+    const oldRender=renderSavedCustomerFiles;window.renderSavedCustomerFiles=function(){const result=oldRender.apply(this,arguments);addMoveButtons();return result};
+    byId('savedExcelFiles').addEventListener('click',e=>{const b=e.target.closest('[data-move-partner]');if(b)moveToPartner(b.dataset.movePartner,b)});
+    // Prevent stale hidden-panel controls from writing to the other source.
+    for(const [id,mode]of [['saveImport','development'],['v43Save','partner']])byId(id).addEventListener('click',e=>{if(uploadMode!==mode){e.preventDefault();e.stopImmediatePropagation();toast('Hãy chọn đúng tab upload trước khi lưu.',4000)}},true);
+    addMoveButtons();selectUpload(window.IDECO_V41?.getMode());
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
+  window.IDECO_V45={selectUpload};
+})();
+</script>
+
+<style id="ideco-v46-mobile-style">
+.hero-grid{align-items:start}
+.image-wrap{min-height:0!important;max-height:none!important;height:auto!important;align-self:start;background:transparent}
+#campaignImage{display:block!important;width:100%!important;height:auto!important;max-height:none!important;object-fit:contain!important;aspect-ratio:auto!important}
+#v46Sheet{position:fixed;inset:0;z-index:100000;background:#0f172a99;display:flex;align-items:center;justify-content:center;padding:16px}
+#v46Sheet[hidden]{display:none!important}
+.v46-sheet-body{background:#fff;width:min(100%,520px);max-height:90dvh;overflow:auto;border-radius:20px;padding:18px;box-shadow:0 16px 70px #0004;box-sizing:border-box}
+.v46-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.v46-sheet-head h3{margin:0;font-size:19px}.v46-sheet-head button{border:0;background:#f1f5f9;border-radius:50%;width:44px;height:44px;font-size:24px}
+#v46Customer{font-weight:800;line-height:1.5;margin:14px 0;overflow-wrap:anywhere}
+.v46-actions{display:grid;gap:10px}.v46-actions a,.v46-actions button{padding:13px;border-radius:12px;border:1px solid #bfdbfe;font:700 15px system-ui;min-height:48px;text-align:center;cursor:pointer;text-decoration:none;box-sizing:border-box;background:#eff6ff;color:#0753b9}
+#v46Open{background:#0068ff;color:#fff}#v46Share{background:#15803d;color:#fff}.v46-actions button:disabled{opacity:.45;cursor:wait}
+#v46Status{font-size:14px;line-height:1.55;margin:12px 0;color:#475569}.v46-help{font-size:13px;color:#64748b;line-height:1.5;margin-top:12px}
+@media(max-width:820px){
+  #v41CustomerTabs{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:6px!important;padding:8px!important}
+  #v41CustomerTabs .v41-tab{min-width:0!important;padding:10px 6px!important;gap:4px;flex-wrap:wrap}
+  #v41CustomerTabs .v41-tab .label{white-space:normal!important;font-size:12px!important;line-height:1.35}
+  #v41CustomerTabs>.btn,#v41ModeNote{grid-column:1/-1;width:100%;box-sizing:border-box}
+  .hero-grid>*{min-width:0;width:100%;box-sizing:border-box}
+  #messageTemplate{display:block;width:100%!important;min-height:150px;font-size:16px;box-sizing:border-box}
+  input,select,textarea{font-size:16px!important;max-width:100%;box-sizing:border-box}
+  #v35SimpleSend{min-width:0}#v35SimpleSend .v35-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  #v35Open,#v35SentNext{grid-column:1/-1;min-height:52px;font-size:15px}
+  #v35SimpleSend button{white-space:normal;line-height:1.4;min-height:46px}
+  #v35FeatureBar,#v36ImageHint,#v38PreviewNote{display:none!important}
+  #v38PreviewBar{display:grid;grid-template-columns:1fr 1fr}#v38OpenCustomize{grid-column:1/-1}
+  #v45UploadSettings{min-width:0}.v45-upload-tabs{padding:8px;gap:6px}.v45-upload-tabs button{font-size:13px;min-width:0;padding:10px 6px}
+  .modal-dialog,.modal-box{max-width:calc(100vw - 16px)!important}.modal-body{padding:12px!important}
+  #v46Sheet{align-items:flex-end;padding:0}.v46-sheet-body{width:100%;max-height:92dvh;border-radius:22px 22px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+}
+</style>
+<div id="v46Sheet" hidden role="dialog" aria-modal="true" aria-labelledby="v46Title">
+  <div class="v46-sheet-body">
+    <div class="v46-sheet-head"><h3 id="v46Title">Gửi Zalo trên điện thoại</h3><button id="v46Close" type="button" aria-label="Đóng">×</button></div>
+    <div id="v46Customer"></div>
+    <div class="v46-actions">
+      <a id="v46Open" target="_blank" rel="noopener">📲 Mở Zalo của khách</a>
+      <button id="v46Share" type="button" disabled>📤 Chia sẻ ảnh → chọn Zalo</button>
+      <button id="v46Download" type="button" disabled>⬇ Lưu ảnh để đính kèm Zalo</button>
+      <button id="v46Copy" type="button">📋 Sao chép lời nhắn</button>
+    </div>
+    <div id="v46Status" role="status" aria-live="polite"></div>
+    <div class="v46-help">Chọn Zalo trong bảng chia sẻ và kiểm tra đúng tên/SĐT khách trước khi gửi. Nếu liên kết không mở đúng cuộc trò chuyện, tìm khách bằng số điện thoại trong Zalo. Sau khi gửi, quay lại ứng dụng và bấm “ĐÃ GỬI”.</div>
+  </div>
+</div>
+<script id="ideco-v46-mobile-js">
+(function(){
+  const $=id=>document.getElementById(id);
+  const isMobile=()=>/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(/Macintosh/i.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
+  let active=null,activeMode=null,file=null,downloadUrl='',generation=0,onOpened=null,previousFocus=null,sharing=false;
+  const status=t=>{$('v46Status').textContent=t};
+  function clearFile(){file=null;if(downloadUrl)URL.revokeObjectURL(downloadUrl);downloadUrl='';$('v46Share').disabled=true;$('v46Download').disabled=true;}
+  function close(){generation++;$('v46Sheet').hidden=true;active=null;onOpened=null;clearFile();previousFocus?.focus?.();}
+  function mobileUrl(c){const p=localMobilePhone(c?.dienThoai);return p?'https://zalo.me/'+encodeURIComponent(p):'';}
+  function stillValid(){return active&&activeMode===window.IDECO_V41?.getMode()&&(state.customers||[]).some(c=>customerKey(c)===customerKey(active))&&operatorReady()&&(!window.IDECO_V28?.getClaim(active)||!['sent','blocked','unavailable'].includes(window.IDECO_V28.getClaim(active).status))&&(!window.IDECO_V28?.getClaim(active)?.employeeName||norm(window.IDECO_V28.getClaim(active).employeeName)===norm(state.operator.employeeName));}
+  function ensureValid(){if(stillValid())return true;status('Khách hoặc trạng thái phụ trách đã thay đổi. Đóng khung và chọn lại khách.');return false;}
+  function canvasBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Không tạo được ảnh gửi.')),'image/png'));}
+  async function prepare(c){
+    const imageOnly=localStorage.getItem('ideco_zalo_send_mode_v29')==='image';
+    if(!imageOnly){if(!window.IDECO_V23?.renderCardCanvas)throw new Error('Khung ảnh và thư chưa sẵn sàng.');return canvasBlob(await window.IDECO_V23.renderCardCanvas(c));}
+    const im=new Image();await new Promise((resolve,reject)=>{im.onload=resolve;im.onerror=()=>reject(new Error('Không đọc được ảnh.'));im.src=state.image?.dataUrl||DEFAULT_IMAGE_DATA});
+    const factor=Math.min(1,6000/Math.max(im.naturalWidth,im.naturalHeight));
+    const cv=document.createElement('canvas');cv.width=Math.max(1,Math.round(im.naturalWidth*factor));cv.height=Math.max(1,Math.round(im.naturalHeight*factor));cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);return canvasBlob(cv);
+  }
+  async function show(c,callback){
+    const url=mobileUrl(c);if(!url)return;
+    const ticket=++generation;clearFile();previousFocus=document.activeElement;active=c;activeMode=window.IDECO_V41?.getMode();onOpened=callback;sharing=false;
+    $('v46Customer').textContent=(c.tenKhachHang||'Khách hàng')+' · '+localMobilePhone(c.dienThoai);
+    $('v46Open').href=url;$('v46Sheet').hidden=false;$('v46Close').focus();status('Đang chuẩn bị ảnh theo khách đã chọn…');
+    try{
+      const blob=await prepare(c);if(ticket!==generation)return;
+      file=new File([blob],'IDECO_'+localMobilePhone(c.dienThoai)+'.png',{type:'image/png'});downloadUrl=URL.createObjectURL(file);$('v46Download').disabled=false;
+      let supported=false;try{supported=!!(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]}))}catch(_){}
+      $('v46Share').disabled=!supported;
+      status(supported?'Ảnh đã sẵn sàng. Bấm Chia sẻ ảnh → chọn Zalo → chọn đúng khách → Gửi.':'Trình duyệt này chưa hỗ trợ chia sẻ ảnh trực tiếp. Bấm Lưu ảnh, rồi mở Zalo và đính kèm ảnh.');
+    }catch(e){if(ticket===generation)status('Chưa tạo được ảnh: '+(e.message||e)+'. Anh vẫn có thể sao chép lời nhắn và mở Zalo.');}
+  }
+  $('v46Close').addEventListener('click',close);
+  $('v46Sheet').addEventListener('click',e=>{if(e.target===$('v46Sheet'))close()});
+  document.addEventListener('keydown',e=>{if($('v46Sheet').hidden)return;if(e.key==='Escape')close();if(e.key==='Tab'){const a=Array.from($('v46Sheet').querySelectorAll('button:not(:disabled),a[href]'));const first=a[0],last=a[a.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}});
+  $('v46Open').addEventListener('click',e=>{if(!ensureValid()){e.preventDefault();return;}onOpened?.();status('Điện thoại sẽ xử lý liên kết Zalo của khách. Nếu đã đăng nhập trong ứng dụng, anh tiếp tục dùng tài khoản đó để gửi.');});
+  $('v46Share').addEventListener('click',async()=>{
+    if(!file||sharing||!ensureValid())return;const ticket=generation,notify=onOpened;sharing=true;
+    try{await navigator.share({files:[file],title:'IDECO'});if(ticket===generation){notify?.();status('Đã chuyển ảnh qua bảng chia sẻ. Kiểm tra gửi thành công trong Zalo trước khi xác nhận ĐÃ GỬI.');}}
+    catch(e){if(ticket===generation)status(e.name==='AbortError'?'Đã hủy chia sẻ; chưa ghi nhận gửi.':'Không chia sẻ được. Anh có thể bấm Lưu ảnh rồi đính kèm trong Zalo.');}
+    finally{sharing=false;}
+  });
+  $('v46Download').addEventListener('click',()=>{if(!downloadUrl||!ensureValid())return;const a=document.createElement('a');a.href=downloadUrl;a.download=file.name;document.body.appendChild(a);a.click();a.remove();status('Đã yêu cầu lưu ảnh. Mở Zalo, chọn đúng khách và đính kèm ảnh vừa lưu.');});
+  $('v46Copy').addEventListener('click',async()=>{if(!ensureValid())return;try{const ok=await copyTextValue(customerMessage(active));status(ok===false?'Chưa sao chép được. Hãy sao chép từ ô nội dung trên trang.':'Đã sao chép lời nhắn. Mở Zalo → nhấn giữ ô nhập → Dán → Gửi.');}catch(_){status('Chưa sao chép được. Hãy sao chép từ ô nội dung trên trang.');}});
+  function imageReady(){const im=$('campaignImage');if(!im?.naturalWidth)return;im.closest('.mobile-image-card')?.classList.remove('mobile-collapsed');}
+  $('campaignImage')?.addEventListener('load',imageReady);
+  window.IDECO_V46={isMobile,show,mobileUrl};
 })();
 </script>
 
