@@ -1378,7 +1378,7 @@ async function imageToPngBlob(){
 }
 function startClipboardWrite(){
   if(!navigator.clipboard||!window.ClipboardItem) return Promise.reject(new Error('Trình duyệt chưa hỗ trợ copy ảnh Clipboard. Hãy dùng Chrome/Edge qua HTTPS.'));
-  const blobPromise=imageToPngBlob();
+  const blobPromise=window.IDECO_V26?.renderImageCanvas?window.IDECO_V26.renderImageCanvas().then(c=>new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('Không tạo được ảnh PNG')),'image/png'))):imageToPngBlob();
   try{
     return navigator.clipboard.write([new ClipboardItem({'image/png':blobPromise})]);
   }catch(e){
@@ -2329,7 +2329,7 @@ if($('openDirectSelected')) $('openDirectSelected').addEventListener('click',asy
   const c=arr[0],p=localMobilePhone(c.dienThoai);
   if(!p){toast('SĐT khách hàng không hợp lệ.');return;}
   state.batch.current=c;updateMessagePreview(c);
-  await copyTextValue(customerMessage(c));
+  if(localStorage.getItem('ideco_zalo_send_mode_v29')!=='image')await copyTextValue(customerMessage(c));
   let w=null;try{w=window.open('https://zalo.me/'+encodeURIComponent(zaloPhone(c.dienThoai)),'_blank','noopener')}catch(_){ }
   if(w) toast('📱 Đã mở Zalo đúng SĐT và copy thư. Nếu cần tự nạp cả ảnh + thư, dùng nút “Nạp ảnh + thư cho 1 khách”.',6500);
   else toast('⚠️ Trình duyệt chặn cửa sổ Zalo. Hãy cho phép pop-up.',6000);
@@ -2434,7 +2434,7 @@ $('deleteAllCustomers').addEventListener('click',deleteAllCustomers);
   }
   async function openCustomer(c,copyTextToo=true){
     if(!c)return;if(!requireOperator())return;const p=validLocal(c);if(!p){setStatus('SĐT không hợp lệ. Khách này không thể mở Zalo.','bad');return}
-    if(copyTextToo){try{await copyTextValue(customerMessage(c))}catch(_){ }}
+    if(copyTextToo&&localStorage.getItem('ideco_zalo_send_mode_v29')!=='image'){try{await copyTextValue(customerMessage(c))}catch(_){ }}
     let w=null;try{w=window.open('https://zalo.me/'+encodeURIComponent(p),'_blank','noopener')}catch(_){w=null}
     if(!w){setStatus('Trình duyệt đã chặn cửa sổ Zalo. Hãy cho phép pop-up rồi thử lại.','bad');toast('⚠️ Không mở được Zalo vì pop-up bị chặn.',5500);await report(c,'failed','Trình duyệt chặn cửa sổ Zalo',false);return}
     setStatus(`Đã mở Zalo theo SĐT ${p}.${copyTextToo?' Thư đã được copy — sang Zalo kiểm tra đúng người rồi Ctrl+V để dán thư.':''}\nSau đó quay lại bấm “Copy ảnh”, sang Zalo Ctrl+V để dán banner.`,'ok');await report(c,'opened','Đã mở liên kết Zalo thủ công',false)
@@ -2568,6 +2568,7 @@ Sau khi cập nhật, khách này sẽ được đánh dấu ĐÃ GỬI + tên n
     ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
   }
   async function renderCardCanvas(c){
+    if(window.IDECO_V26?.renderCardCanvas)return window.IDECO_V26.renderCardCanvas(c);
     if(!c) throw new Error('Chưa chọn khách hàng.');
     const img=await loadImage(getSourceData());
     const W=1200, outer=48, inner=W-outer*2;
@@ -2669,14 +2670,14 @@ Sau khi cập nhật, khách này sẽ được đánh dấu ĐÃ GỬI + tên n
     }
   }
   async function previewCard(c){
-    if(!c){setStatus('Chưa chọn khách hàng.',false);return;}
+    if(!c&&localStorage.getItem('ideco_zalo_send_mode_v29')!=='image'){setStatus('Chưa chọn khách hàng.',false);return;}
     try{
-      setStatus('Đang dựng thẻ xem trước…');
+      setStatus('Đang dựng ảnh xem trước…');
       const canvas=await renderCardCanvas(c);
       const img=new Image();img.src=canvas.toDataURL('image/png');
       const body=$('v23PreviewBody');body.innerHTML='';body.appendChild(img);
       $('v23PreviewOverlay').classList.add('open');$('v23PreviewOverlay').setAttribute('aria-hidden','false');
-      setStatus('Đã tạo thẻ xem trước.');
+      setStatus((localStorage.getItem('ideco_zalo_send_mode_v29')==='image'?'CHỈ ẢNH':'ẢNH + THƯ')+' · Kích thước ảnh xuất: '+canvas.width+' × '+canvas.height+' px.');
     }catch(e){setStatus('❌ '+(e.message||e),false)}
   }
   function closePreview(){$('v23PreviewOverlay')?.classList.remove('open');$('v23PreviewOverlay')?.setAttribute('aria-hidden','true')}
@@ -2903,22 +2904,28 @@ Nội dung thư đã tự đồng bộ cách xưng hô ${r.salutation==='Anh/Ch�
   function rr(ctx,x,y,w,h,r){
     r=Math.max(0,Math.min(r,w/2,h/2));ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
   }
-  async function renderCardCanvas(c){
-    if(!c) throw new Error('Chưa chọn khách hàng.');
+  async function renderImageCanvas(){
+    const conf={...cfg};
     const img=await loadImage(getSourceData());
-    const W=Math.round(cfg.cardWidth),outer=Math.round(W*0.04),inner=W-outer*2;
-    const bannerMaxH=12000; // Tự tăng chiều cao theo ảnh, giới hạn để canvas không quá lớn.
-    const baseScale=Math.min(inner/img.naturalWidth,bannerMaxH/img.naturalHeight,2.4);
-    let scale=baseScale*(cfg.bannerScale/100);
-    // Không crop banner: chỉ phóng tới giới hạn khung.
-    scale=Math.min(scale,inner/img.naturalWidth,bannerMaxH/img.naturalHeight);
-    const bw=Math.max(1,Math.round(img.naturalWidth*scale));
-    const bh=Math.max(1,Math.round(img.naturalHeight*scale));
+    const W=Math.round(conf.cardWidth*conf.bannerScale/100),H=Math.max(1,Math.round(W*img.naturalHeight/img.naturalWidth));
+    if(H>12000)throw new Error('Ảnh quá dài ở kích thước này. Hãy giảm chiều rộng hoặc tỷ lệ phóng.');
+    const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
+    const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(img,0,0,W,H);
+    return canvas;
+  }
+  async function renderCardCanvas(c){
+    if(localStorage.getItem('ideco_zalo_send_mode_v29')==='image')return renderImageCanvas();
+    if(!c)throw new Error('Chưa chọn khách hàng.');
+    const conf={...cfg};
+    const img=await loadImage(getSourceData());
+    const W=Math.round(conf.cardWidth*conf.bannerScale/100),outer=Math.round(W*0.04),inner=W-outer*2;
+    const bw=inner,bh=Math.max(1,Math.round(inner*img.naturalHeight/img.naturalWidth));
+    if(bh>12000)throw new Error('Ảnh quá dài ở kích thước này. Hãy giảm chiều rộng hoặc tỷ lệ phóng.');
     const msg=(typeof customerMessage==='function'?customerMessage(c):'').trim();
     const measure=document.createElement('canvas');measure.width=W;measure.height=10;
     const m=measure.getContext('2d');
-    const fontSize=Math.round(cfg.textSize),firstFontSize=Math.round(cfg.titleSize);
-    const lineH=Math.round(fontSize*cfg.lineHeight),textPadX=Math.round(cfg.padding),textPadY=Math.round(cfg.padding*.95);
+    const fontSize=Math.round(conf.textSize),firstFontSize=Math.round(conf.titleSize);
+    const lineH=Math.round(fontSize*conf.lineHeight),textPadX=Math.round(conf.padding),textPadY=Math.round(conf.padding*.95);
     m.font=`${fontSize}px "Segoe UI", Arial, sans-serif`;
     const maxTextWidth=inner-textPadX*2;
     const paras=msg.split(/\r?\n/),lines=[];
@@ -2962,7 +2969,7 @@ Nội dung thư đã tự đồng bộ cách xưng hô ${r.salutation==='Anh/Ch�
       titleSize:clamp(Number($('v26TitleSize')?.value)||DEFAULTS.titleSize,22,46),
       lineHeight:clamp(Number($('v26LineHeight')?.value)||DEFAULTS.lineHeight,1.15,2),
       padding:clamp(Number($('v26Padding')?.value)||DEFAULTS.padding,18,60)
-    };save();refreshValuesOnly();
+    };save();refreshValuesOnly();window.dispatchEvent(new Event('ideco-output-change'));
   }
   function refreshValuesOnly(){
     const p=[['v26CardWidth','cardWidth',' px'],['v26BannerScale','bannerScale','%'],['v26TextSize','textSize',' px'],['v26TitleSize','titleSize',' px'],['v26Padding','padding',' px']];
@@ -2986,8 +2993,8 @@ Nội dung thư đã tự đồng bộ cách xưng hô ${r.salutation==='Anh/Ch�
       <div class="v26-title">🎨 Tùy chỉnh thẻ trước khi dán <span style="font-size:11px;color:#64748b;font-weight:700">(lưu riêng trên máy này)</span></div>
       <div class="v26-sub">Kéo thanh để chỉnh kích thước. Bấm “Áp dụng & xem trước” để kiểm tra trước khi Copy sang Zalo.</div>
       <div class="v26-grid">
-        <div class="v26-item"><div class="v26-label"><span>Chiều rộng thẻ</span><span class="v26-value" id="v26CardWidthVal"></span></div><input id="v26CardWidth" type="range" min="900" max="1500" step="50"></div>
-        <div class="v26-item"><div class="v26-label"><span>Kích thước banner</span><span class="v26-value" id="v26BannerScaleVal"></span></div><input id="v26BannerScale" type="range" min="70" max="125" step="5"></div>
+        <div class="v26-item"><div class="v26-label"><span>Chiều rộng gốc (px)</span><span class="v26-value" id="v26CardWidthVal"></span></div><input id="v26CardWidth" type="range" min="900" max="1500" step="50"></div>
+        <div class="v26-item"><div class="v26-label"><span>Tỷ lệ phóng ảnh xuất</span><span class="v26-value" id="v26BannerScaleVal"></span></div><input id="v26BannerScale" type="range" min="70" max="125" step="5"></div>
         <div class="v26-item"><div class="v26-label"><span>Cỡ chữ nội dung</span><span class="v26-value" id="v26TextSizeVal"></span></div><input id="v26TextSize" type="range" min="20" max="40" step="1"></div>
         <div class="v26-item"><div class="v26-label"><span>Cỡ chữ mở đầu</span><span class="v26-value" id="v26TitleSizeVal"></span></div><input id="v26TitleSize" type="range" min="22" max="46" step="1"></div>
         <div class="v26-item"><div class="v26-label"><span>Khoảng cách dòng</span><span class="v26-value" id="v26LineHeightVal"></span></div><input id="v26LineHeight" type="range" min="1.15" max="2" step="0.05"></div>
@@ -2998,7 +3005,7 @@ Nội dung thư đã tự đồng bộ cách xưng hô ${r.salutation==='Anh/Ch�
     syncControls();
     panel.querySelectorAll('input[type=range]').forEach(inp=>inp.addEventListener('input',()=>{readControls();const s=$('v26Saved');if(s)s.textContent='✓ Đã lưu';clearTimeout(previewTimer);if($('v23PreviewOverlay')?.classList.contains('open'))previewTimer=setTimeout(preview,180)}));
     $('v26Apply')?.addEventListener('click',preview);
-    $('v26Reset')?.addEventListener('click',()=>{cfg={...DEFAULTS};save();syncControls();const s=$('v26Saved');if(s)s.textContent='Đã về mặc định';preview()});
+    $('v26Reset')?.addEventListener('click',()=>{cfg={...DEFAULTS};save();syncControls();window.dispatchEvent(new Event('ideco-output-change'));const s=$('v26Saved');if(s)s.textContent='Đã về mặc định';preview()});
   }
   function patchRenderer(){
     const go=()=>{if(window.IDECO_V23){window.IDECO_V23.renderCardCanvas=renderCardCanvas;return true}return false};
@@ -3006,7 +3013,7 @@ Nội dung thư đã tự đồng bộ cách xưng hô ${r.salutation==='Anh/Ch�
   }
   patchRenderer();
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,650));else setTimeout(install,650);
-  window.IDECO_V26={getConfig:()=>({...cfg}),renderCardCanvas,preview};
+  window.IDECO_V26={getConfig:()=>({...cfg}),renderCardCanvas,renderImageCanvas,preview};
 })();
 </script>
 
@@ -3323,7 +3330,9 @@ Nội dung thư đã tự đồng bộ cách xưng hô ${r.salutation==='Anh/Ch�
 #v29SendMode .v29-mode b{display:block;color:#0f172a;font-size:12.5px}
 #v29SendMode .v29-mode span{display:block;margin-top:2px;color:#64748b;font-size:11.5px;line-height:1.4}
 #v29ImageOnlyNote{display:none;margin-top:8px;padding:8px 10px;border-radius:8px;background:#ecfdf5;border:1px solid #a7f3d0;color:#166534;font-size:11.8px;line-height:1.45}
-body.v29-image-only #v26Customize{display:none!important}
+body.v29-image-only #v26Customize{display:block!important}
+body.v29-image-only #v26Customize .v26-item:nth-child(n+3){display:none!important}
+body.v29-image-only #v46Copy,body.v29-image-only .copy-msg,body.v29-image-only #copyCurrentMessage{display:none!important}
 body.v29-image-only #v25AiSalute{display:none!important}
 body.v29-image-only #v29ImageOnlyNote{display:block}
 </style>
@@ -3359,7 +3368,7 @@ body.v29-image-only #v29ImageOnlyNote{display:block}
     // Chỉ ảnh: bắt đầu copy trong chính thao tác click, đồng thời gọi Zalo PC.
     let cp;try{cp=copyRawImage()}catch(e){cp=Promise.reject(e)}
     launchPc(p);
-    setStatus(`Đang mở Zalo PC cho ${c.tenKhachHang||p} và copy ảnh banner gốc…`);
+    setStatus(`Đang mở Zalo PC cho ${c.tenKhachHang||p} và copy ảnh theo kích thước đã chỉnh…`);
     try{
       await cp;
       setStatus(`✅ Đã copy CHỈ ẢNH cho ${c.tenKhachHang||p}.\nZalo PC đã được gọi bằng SĐT ${p}. Khi đúng khách mở ra, Ctrl+V một lần để dán ảnh rồi kiểm tra và Gửi.`,true);
@@ -3367,19 +3376,13 @@ body.v29-image-only #v29ImageOnlyNote{display:block}
     }catch(e){setStatus('⚠️ Đã gọi Zalo PC nhưng chưa copy được ảnh: '+(e&&e.message||e),false)}
   }
   async function previewByMode(){
-    const c=currentCustomer();if(!c){alert('Vui lòng chọn 1 khách hàng trước.');return}
-    if(mode()==='card'){
-      if(window.IDECO_V23&&typeof window.IDECO_V23.previewCard==='function') return window.IDECO_V23.previewCard(c);
-      return;
-    }
-    const ov=$('v23PreviewOverlay'),body=$('v23PreviewBody'),head=$('v23PreviewHead');if(!ov||!body)return;
-    const src=String((window.state&&state.image&&state.image.dataUrl)||window.DEFAULT_IMAGE_DATA||'');
-    if(head)head.childNodes[0].nodeValue='👁 Xem trước — Chỉ ảnh banner ';
-    body.innerHTML=src?`<img src="${src}" alt="Banner gửi Zalo">`:'<div class="muted">Chưa có ảnh banner.</div>';
-    ov.classList.add('open');ov.setAttribute('aria-hidden','false');
+    const c=currentCustomer();
+    if(!c&&mode()!=='image'){alert('Vui lòng chọn 1 khách hàng trước.');return;}
+    return window.IDECO_V23?.previewCard(c);
   }
   function setMode(v){
     v=v==='image'?'image':'card';localStorage.setItem(LS,v);document.body.classList.toggle('v29-image-only',v==='image');
+    if($('v35Mode'))$('v35Mode').value=v;window.dispatchEvent(new Event('ideco-output-change'));
     document.querySelectorAll('#v29SendMode .v29-mode').forEach(x=>x.classList.toggle('active',x.dataset.mode===v));
     const r=$(`v29Mode_${v}`);if(r)r.checked=true;
     const b=$('v25OpenPc');if(b)b.textContent=v==='image'?'📱 Mở Zalo PC + Copy CHỈ ẢNH':'📱 Mở Zalo PC + Copy ẢNH + THƯ';
@@ -3400,9 +3403,9 @@ body.v29-image-only #v29ImageOnlyNote{display:block}
         <div class="v29-title">📌 CHỌN NỘI DUNG GỬI ZALO</div>
         <div class="v29-options">
           <label class="v29-mode" data-mode="card"><input type="radio" name="v29Mode" id="v29Mode_card" value="card"><div><b>🖼️ + 📝 Ảnh + thư</b><span>Ghép banner và thư cá nhân hóa thành 1 thẻ, Ctrl+V một lần.</span></div></label>
-          <label class="v29-mode" data-mode="image"><input type="radio" name="v29Mode" id="v29Mode_image" value="image"><div><b>🖼️ Chỉ gửi ảnh</b><span>Copy đúng banner gốc, không ghép tên khách hay nội dung thư.</span></div></label>
+          <label class="v29-mode" data-mode="image"><input type="radio" name="v29Mode" id="v29Mode_image" value="image"><div><b>🖼️ Chỉ gửi ảnh</b><span>Xuất banner theo kích thước đã chỉnh, không ghép tên khách hay thư.</span></div></label>
         </div>
-        <div id="v29ImageOnlyNote">✅ Chế độ này bỏ hoàn toàn phần thư. AI xưng hô và tùy chỉnh chữ được ẩn để giao diện gọn hơn.</div>`;
+        <div id="v29ImageOnlyNote">✅ Chế độ này bỏ hoàn toàn phần thư. Kích thước vẫn áp dụng vào ảnh gửi; không ghép thêm thư, tiêu đề hay chân trang.</div>`;
       const desc=box.querySelector('.v23-desc');if(desc)desc.insertAdjacentElement('afterend',p);else box.prepend(p);
       p.querySelectorAll('input[name="v29Mode"]').forEach(r=>r.addEventListener('change',()=>setMode(r.value)));
     }
@@ -4680,22 +4683,21 @@ body.v40-show-customize #v26Customize{display:block!important}
   function close(){generation++;$('v46Sheet').hidden=true;active=null;onOpened=null;clearFile();previousFocus?.focus?.();}
   function mobileUrl(c){const p=localMobilePhone(c?.dienThoai);return p?'https://zalo.me/'+encodeURIComponent(p):'';}
   function stillValid(){return active&&activeMode===window.IDECO_V41?.getMode()&&(state.customers||[]).some(c=>customerKey(c)===customerKey(active))&&operatorReady()&&(!window.IDECO_V28?.getClaim(active)||!['sent','blocked','unavailable'].includes(window.IDECO_V28.getClaim(active).status))&&(!window.IDECO_V28?.getClaim(active)?.employeeName||norm(window.IDECO_V28.getClaim(active).employeeName)===norm(state.operator.employeeName));}
-  function ensureValid(){if(stillValid())return true;status('Khách hoặc trạng thái phụ trách đã thay đổi. Đóng khung và chọn lại khách.');return false;}
+  function ensureValid(){if(stillValid()&&preparedSignature===outputSignature())return true;status('Khách hoặc trạng thái phụ trách đã thay đổi. Đóng khung và chọn lại khách.');return false;}
   function canvasBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Không tạo được ảnh gửi.')),'image/png'));}
   async function prepare(c){
-    const imageOnly=localStorage.getItem('ideco_zalo_send_mode_v29')==='image';
-    if(!imageOnly){if(!window.IDECO_V23?.renderCardCanvas)throw new Error('Khung ảnh và thư chưa sẵn sàng.');return canvasBlob(await window.IDECO_V23.renderCardCanvas(c));}
-    const im=new Image();await new Promise((resolve,reject)=>{im.onload=resolve;im.onerror=()=>reject(new Error('Không đọc được ảnh.'));im.src=state.image?.dataUrl||DEFAULT_IMAGE_DATA});
-    const factor=Math.min(1,6000/Math.max(im.naturalWidth,im.naturalHeight));
-    const cv=document.createElement('canvas');cv.width=Math.max(1,Math.round(im.naturalWidth*factor));cv.height=Math.max(1,Math.round(im.naturalHeight*factor));cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);return canvasBlob(cv);
+    if(!window.IDECO_V26?.renderCardCanvas)throw new Error('Bộ tạo ảnh chưa sẵn sàng.');
+    return canvasBlob(await window.IDECO_V26.renderCardCanvas(c));
   }
+  function outputSignature(){return JSON.stringify([localStorage.getItem('ideco_zalo_send_mode_v29'),window.IDECO_V26?.getConfig(),state.image?.dataUrl,active?customerMessage(active):'']);}
+  let preparedSignature='';
   async function show(c,callback){
     const url=mobileUrl(c);if(!url)return;
-    const ticket=++generation;clearFile();previousFocus=document.activeElement;active=c;activeMode=window.IDECO_V41?.getMode();onOpened=callback;sharing=false;
+    const ticket=++generation;clearFile();previousFocus=document.activeElement;active=c;activeMode=window.IDECO_V41?.getMode();onOpened=callback;sharing=false;preparedSignature=outputSignature();
     $('v46Customer').textContent=(c.tenKhachHang||'Khách hàng')+' · '+localMobilePhone(c.dienThoai);
     $('v46Open').href=url;$('v46Sheet').hidden=false;$('v46Close').focus();status('Đang chuẩn bị ảnh theo khách đã chọn…');
     try{
-      const blob=await prepare(c);if(ticket!==generation)return;
+      const blob=await prepare(c);if(ticket!==generation)return;if(preparedSignature!==outputSignature()){show(c,callback);return;}
       file=new File([blob],'IDECO_'+localMobilePhone(c.dienThoai)+'.png',{type:'image/png'});downloadUrl=URL.createObjectURL(file);$('v46Download').disabled=false;
       let supported=false;try{supported=!!(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]}))}catch(_){}
       $('v46Share').disabled=!supported;
@@ -4716,6 +4718,7 @@ body.v40-show-customize #v26Customize{display:block!important}
   $('v46Copy').addEventListener('click',async()=>{if(!ensureValid())return;try{const ok=await copyTextValue(customerMessage(active));status(ok===false?'Chưa sao chép được. Hãy sao chép từ ô nội dung trên trang.':'Đã sao chép lời nhắn. Mở Zalo → nhấn giữ ô nhập → Dán → Gửi.');}catch(_){status('Chưa sao chép được. Hãy sao chép từ ô nội dung trên trang.');}});
   function imageReady(){const im=$('campaignImage');if(!im?.naturalWidth)return;im.closest('.mobile-image-card')?.classList.remove('mobile-collapsed');}
   $('campaignImage')?.addEventListener('load',imageReady);
+  window.addEventListener('ideco-output-change',()=>{if(active&&!$('v46Sheet').hidden)show(active,onOpened)});
   window.IDECO_V46={isMobile,show,mobileUrl};
 })();
 </script>
