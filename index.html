@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>IDECO V35 — Zalo đơn giản · Tự động khách tiếp theo · Firebase trạng thái</title>
+<title>IDECO V48 — Zalo mobile và gọi điện trực tiếp</title>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -301,12 +301,21 @@ tbody tr:hover td{background:#fff3f3}
 <style id="ideco-v47-call-style">
 .customer-call{display:inline-flex;align-items:center;min-height:44px;color:#0068ff!important;font-weight:800;text-decoration:underline;touch-action:manipulation}
 </style>
+<script id="ideco-v48-call-routing">
+window.addEventListener('click',function(e){
+  const a=e.target.closest?.('a.customer-call[href^="tel:"]');
+  if(!a)return;
+  a.target='_top';
+  e.stopImmediatePropagation();
+  // Do not preventDefault: the real user tap launches the system telephone handler.
+},true);
+</script>
 </head>
 <body>
 <div id="loginGate">
   <div class="login-card">
     <div class="logo-mark"><div class="logo-icon">◆</div><span>iDECO</span></div>
-    <h1>ỨNG DỤNG PHÁT TRIỂN KHÁCH HÀNG</h1>
+    <h1>ỨNG DỤNG PHÁT TRIỂN KHÁCH HÀNG</h1><span id="idecoBuild48" style="display:inline-block;background:#dcfce7;color:#166534;padding:5px 9px;border-radius:6px;font-size:12px;font-weight:800">V48 · Zalo mobile / Bấm SĐT để gọi</span>
     <p>Danh sách khách hàng · Ảnh chương trình · Gửi Zalo tuần tự</p>
     <div class="login-mission">
       <div class="mission-main">TÌM KIẾM - CHINH PHỤC KHÁCH HÀNG HỢP TÁC LÀ CÁCH THỂ HIỆN NĂNG LỰC CỐT LÕI TRONG KINH DOANH - BÁN HÀNG</div>
@@ -764,12 +773,12 @@ function cleanPhone(v){return String(v??'').replace(/[^\d+]/g,'').trim();}
 function customerCallLink(value, extraClass=''){
   const raw=String(value??'').trim();
   const links=raw.split(/\s*(?:[;/|,]|\n)\s*/).filter(Boolean).map(part=>{
-    let d=part.replace(/[\s().-]/g,'');
+    let d=part.replace(/[\s().\-\u200B-\u200D\uFEFF]/g,'').replace(/^'/,'');
     if(/^0084\d+$/.test(d))d='+'+d.slice(2);
     if(/^84\d{9,10}$/.test(d))d='+'+d;
     if(/^[35789]\d{8}$/.test(d))d='0'+d;
     if(!/^(?:0\d{9,10}|\+[1-9]\d{7,14})$/.test(d))return esc(part);
-    return '<a class="customer-call '+esc(extraClass)+'" href="tel:'+esc(d)+'" title="Gọi '+esc(part)+'">'+esc(part)+'</a>';
+    return '<a class="customer-call '+esc(extraClass)+'" href="tel:'+esc(d)+'" target="_top" title="Gọi '+esc(part)+'">'+esc(part)+'</a>';
   });
   return links.join(' / ');
 }
@@ -1237,7 +1246,7 @@ function renderManualCustomers(){
   const body=$('manualCustomerBody');if(!body)return;
   const list=[...state.manualCustomers].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   if(!list.length){body.innerHTML='<tr><td colspan="8" class="empty">Chưa có khách hàng nhập thủ công.</td></tr>';return;}
-  body.innerHTML=list.map((c,i)=>{const m=c.diaChi?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(c.diaChi):'';return `<tr><td>${i+1}</td><td><b>${esc(c.tenKhachHang||'')}</b></td><td>${esc(c.nguoiLienHe||'')}</td><td>${esc(c.dienThoai||'')}</td><td>${m?`<a class="map-link" href="${m}" data-map-address="${esc(c.diaChi||'')}" data-map-name="${esc(c.tenKhachHang||'')}" title="Xem bản đồ ngay trong ứng dụng: ${esc(c.diaChi||'')}">${esc(c.diaChi||'')}</a>`:esc(c.diaChi||'')}</td><td>${esc(c.nhanVien||'')}</td><td>${esc(c.xungHo||salutationForCustomer(c))}</td><td><button class="manual-delete-btn" data-manual-del="${esc(c.id)}">🗑 Xóa</button></td></tr>`}).join('');
+  body.innerHTML=list.map((c,i)=>{const m=c.diaChi?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(c.diaChi):'';return `<tr><td>${i+1}</td><td><b>${esc(c.tenKhachHang||'')}</b></td><td>${esc(c.nguoiLienHe||'')}</td><td>${customerCallLink(c.dienThoai)}</td><td>${m?`<a class="map-link" href="${m}" data-map-address="${esc(c.diaChi||'')}" data-map-name="${esc(c.tenKhachHang||'')}" title="Xem bản đồ ngay trong ứng dụng: ${esc(c.diaChi||'')}">${esc(c.diaChi||'')}</a>`:esc(c.diaChi||'')}</td><td>${esc(c.nhanVien||'')}</td><td>${esc(c.xungHo||salutationForCustomer(c))}</td><td><button class="manual-delete-btn" data-manual-del="${esc(c.id)}">🗑 Xóa</button></td></tr>`}).join('');
 }
 async function saveManualCustomer(){
   const c={
@@ -1366,7 +1375,7 @@ async function copyTextValue(text){
 function updateSelectedUI(){
   const arr=Array.from(state.selected.values());
   $('selectedBadge').textContent=`Đã chọn ${arr.length}/10`;
-  $('selectedList').innerHTML=arr.length?arr.map((c,i)=>{const k=customerKey(c);return `<li><b>${i+1}.</b> ${esc(c.tenKhachHang||'Khách hàng')} · ${esc(c.dienThoai||'')} ${c.nguoiLienHe?`· <span class="ai-salute-badge">${esc(salutationForCustomer(c))} ${esc(c.nguoiLienHe)}</span>`:''} <button class="mini-btn copy-msg" data-key="${esc(k)}">📋 Lời chào</button><button class="mini-btn img copy-img">🖼 Ảnh</button><button class="mini-btn zalo open-zalo" data-key="${esc(k)}">📱 Zalo</button></li>`}).join(''):'<li class="muted">Chưa chọn khách hàng.</li>';
+  $('selectedList').innerHTML=arr.length?arr.map((c,i)=>{const k=customerKey(c);return `<li><b>${i+1}.</b> ${esc(c.tenKhachHang||'Khách hàng')} · ${customerCallLink(c.dienThoai)} ${c.nguoiLienHe?`· <span class="ai-salute-badge">${esc(salutationForCustomer(c))} ${esc(c.nguoiLienHe)}</span>`:''} <button class="mini-btn copy-msg" data-key="${esc(k)}">📋 Lời chào</button><button class="mini-btn img copy-img">🖼 Ảnh</button><button class="mini-btn zalo open-zalo" data-key="${esc(k)}">📱 Zalo</button></li>`}).join(''):'<li class="muted">Chưa chọn khách hàng.</li>';
   $('batchStart').disabled=state.batch.running||!arr.length||!operatorReady();
   $('batchStart').textContent=arr.length===1?'📱 Mở Zalo trực tiếp + Copy thư':(arr.length>1?`🧰 Tạo Zalo Helper cho ${arr.length} khách`:'📱 Gửi trực tiếp / 🧰 Tạo Helper');
   $('delaySelect').disabled=arr.length<2||state.batch.running;
@@ -1438,7 +1447,7 @@ function renderBatchLog(){
   const cls={wait:'st-wait',open:'st-open',queued:'st-open',ok:'st-ok',skip:'st-skip',fail:'st-fail'};
   const icon={wait:'⏳',open:'🔎',queued:'🧰',ok:'✅',skip:'⏭',fail:'⚠️'};
   if(!b.results.length){list.innerHTML='<div class="small muted" style="padding:10px">Chưa có lượt gửi.</div>';$('batchLogCount').textContent='0/0';return;}
-  list.innerHTML=b.results.map(r=>{const c=r.customer||{};const canConfirm=!['skip','fail','wait'].includes(r.status);return `<div class="batch-log-row"><div class="idx">${r.index+1}</div><div class="cust">${esc(c.tenKhachHang||'Khách hàng')}</div><div class="phone">${esc(localMobilePhone(c.dienThoai)||c.dienThoai||'Không có SĐT')}</div><div class="st ${cls[r.status]||'st-wait'}">${icon[r.status]||''} ${esc(r.text||'')}${canConfirm?`<br><button class="confirm-sent-btn ${r.confirmedSent?'confirmed':''}" data-confirm-index="${r.index}">${r.confirmedSent?'✅ Đã xác nhận gửi':'☑ Xác nhận đã gửi'}</button>`:''}</div></div>`}).join('');
+  list.innerHTML=b.results.map(r=>{const c=r.customer||{};const canConfirm=!['skip','fail','wait'].includes(r.status);return `<div class="batch-log-row"><div class="idx">${r.index+1}</div><div class="cust">${esc(c.tenKhachHang||'Khách hàng')}</div><div class="phone">${customerCallLink(localMobilePhone(c.dienThoai)||c.dienThoai||'Không có SĐT')}</div><div class="st ${cls[r.status]||'st-wait'}">${icon[r.status]||''} ${esc(r.text||'')}${canConfirm?`<br><button class="confirm-sent-btn ${r.confirmedSent?'confirmed':''}" data-confirm-index="${r.index}">${r.confirmedSent?'✅ Đã xác nhận gửi':'☑ Xác nhận đã gửi'}</button>`:''}</div></div>`}).join('');
   const processed=b.results.filter(x=>!['wait','open'].includes(x.status)).length;
   $('batchLogCount').textContent=`${processed}/${b.results.length}`;
   $('batchSummary').textContent=`Đã chuẩn bị/mở: ${b.opened} · Bỏ qua: ${b.skipped} · Lỗi: ${b.failed}. V15 không tự bấm Gửi; nhân viên kiểm tra và xác nhận từng khách.`;
@@ -1960,7 +1969,7 @@ function previewImport(){
   try{
     state.importRows=buildImportRows();$('saveImport').disabled=!state.importRows.length;$('importStatus').textContent=`Đã chuẩn hóa ${state.importRows.length} khách hàng.`;
     const sample=state.importRows.slice(0,8);
-    $('importPreview').innerHTML=`<table><thead><tr><th>Tên khách hàng</th><th>Người liên hệ</th><th>Điện thoại</th><th>Địa chỉ</th><th>Nhân viên phụ trách</th></tr></thead><tbody>${sample.map(c=>`<tr><td>${esc(c.tenKhachHang)}</td><td>${esc(c.nguoiLienHe)}</td><td>${esc(c.dienThoai)}</td><td>${esc(c.diaChi)}</td><td>${esc(c.nhanVien)}</td></tr>`).join('')}</tbody></table>`;
+    $('importPreview').innerHTML=`<table><thead><tr><th>Tên khách hàng</th><th>Người liên hệ</th><th>Điện thoại</th><th>Địa chỉ</th><th>Nhân viên phụ trách</th></tr></thead><tbody>${sample.map(c=>`<tr><td>${esc(c.tenKhachHang)}</td><td>${esc(c.nguoiLienHe)}</td><td>${customerCallLink(c.dienThoai)}</td><td>${esc(c.diaChi)}</td><td>${esc(c.nhanVien)}</td></tr>`).join('')}</tbody></table>`;
     const validPhone=state.importRows.filter(c=>localMobilePhone(c.dienThoai)).length;
     $('importSummary').innerHTML=`✅ File <b>${esc(state.excelName)}</b>: <b>${state.importRows.length}</b> khách · <b>${validPhone}</b> SĐT di động hợp lệ · ${state.importRows.length-validPhone} dòng thiếu/sai SĐT vẫn được lưu nhưng không cho chọn gửi Zalo.`;
   }catch(e){state.importRows=[];$('saveImport').disabled=true;$('importStatus').textContent='❌ '+(e.message||e)}
@@ -2441,7 +2450,7 @@ $('deleteAllCustomers').addEventListener('click',deleteAllCustomers);
   function render(){
     const a=queue(),c=current(),box=$v('v22Current');if(!box)return;
     if(!a.length){box.innerHTML='<div class="v22-name">Chưa chọn khách hàng</div><div class="v22-meta">Tích chọn 1–10 khách ở bảng bên dưới. V22 xử lý thủ công từng khách theo đúng thứ tự.</div>';['v22Open','v22CopyText','v22CopyImage','v22Sent','v22Unavailable','v22Blocked','v22Next'].forEach(id=>{$v(id).disabled=true});$v('v22QueueCount').textContent='0/0';setStatus('Chưa có khách trong hàng đợi.');return}
-    const p=validLocal(c);box.innerHTML=`<div class="v22-name">${qIndex+1}/${a.length} · ${e2(c.tenKhachHang||'Khách hàng')}</div><div class="v22-meta">Người liên hệ: <b>${e2(c.nguoiLienHe||'—')}</b> · SĐT: <b>${e2(p||c.dienThoai||'—')}</b> · NV phụ trách: ${e2(c.nhanVien||c.nhanVienPhuTrach||'—')}</div>`;
+    const p=validLocal(c);box.innerHTML=`<div class="v22-name">${qIndex+1}/${a.length} · ${e2(c.tenKhachHang||'Khách hàng')}</div><div class="v22-meta">Người liên hệ: <b>${e2(c.nguoiLienHe||'—')}</b> · SĐT: <b>${customerCallLink(p||c.dienThoai||'—')}</b> · NV phụ trách: ${e2(c.nhanVien||c.nhanVienPhuTrach||'—')}</div>`;
     $v('v22QueueCount').textContent=`${qIndex+1}/${a.length}`;['v22Open','v22CopyText','v22CopyImage','v22Sent','v22Unavailable','v22Blocked'].forEach(id=>{$v(id).disabled=!p});$v('v22Next').disabled=a.length<2;try{updateMessagePreview(c)}catch(_){ }
   }
   async function report(c,statusCode,statusText,confirmed=false){
@@ -3752,7 +3761,7 @@ body.v29-image-only #v29ImageOnlyNote{display:block}
     const held=claim(c);
     if(!(held&&held.status==='holding'&&same(held.employeeName,employee()))&&!await ensureClaim(c))return;
     if(sourceMode!==window.IDECO_V41?.getMode()||!(state.customers||[]).some(x=>key(x)===key(c))){state.selected.delete(key(c));updateSelectedUI();return;}
-    window.IDECO_V46.show(c,()=>{openedKey=key(c);renderPanel();setStatus('Đã yêu cầu mở/chia sẻ qua Zalo. Kiểm tra đúng người nhận và bấm Gửi trong Zalo; sau đó quay lại xác nhận ĐÃ GỬI.','ok')});
+    window.IDECO_V46.show(c,()=>{openedKey=key(c);renderPanel();setStatus('Đã yêu cầu mở/chia sẻ qua Zalo. Kiểm tra đúng người nhận và bấm Gửi trong Zalo; sau đó quay lại xác nhận ĐÃ GỬI.','ok')},true);
   }
   async function openSpecific(c){if(window.IDECO_V46?.isMobile())return mobileOpen(c);if(!c)return;const g=gate(c);if(!g.ok){setStatus(g.msg,'bad');try{toast('⚠️ '+esc35(g.msg),5000)}catch(_){ }return}if(!await ensureClaim(c))return;let cp;try{cp=copyPayload(c)}catch(e){cp=Promise.reject(e)}const w=openWindowFor(c);if(!w){setStatus('Trình duyệt chặn cửa sổ Zalo. Hãy cho phép pop-up cho trang này.','bad');return}openedKey=key(c);renderPanel();setStatus('Đang mở Zalo theo SĐT '+g.phone+'… Nội dung cũng đang được chuẩn bị tự động.','warn');try{await cp;setStatus('✅ Đã mở Zalo cho '+(c.tenKhachHang||g.phone)+' · '+g.phone+' và đã chuẩn bị '+(sendMode()==='image'?'ẢNH':'ẢNH + THƯ')+'.\nKiểm tra đúng tên/SĐT trên Zalo → Ctrl+V → Gửi → quay lại chỉ bấm “ĐÃ GỬI → KHÁCH TIẾP THEO”.','ok')}catch(e){setStatus('✅ Đã mở Zalo cho '+(c.tenKhachHang||g.phone)+'.\n⚠️ Chưa tự copy được nội dung: '+(e&&e.message||e)+'. Có thể bấm lại “MỞ ZALO KHÁCH NÀY”.','warn')}}
   async function openCurrent(){const c=current();if(c)await openSpecific(c);else setStatus('Chưa chọn khách hàng.','bad')}
@@ -3766,6 +3775,31 @@ body.v29-image-only #v29ImageOnlyNote{display:block}
   function findCustomerFromRow(el){const tr=el&&el.closest&&el.closest('tr[data-key]');if(!tr)return null;return (state.customers||[]).find(c=>key(c)===tr.dataset.key)||null}
   async function selectAndOpen(c){if(!c)return;const g=gate(c);if(!g.ok){setStatus(g.msg,'bad');try{toast('⚠️ '+esc35(g.msg),5500)}catch(_){ }return}const k=key(c);if(!state.selected.has(k)){if(state.selected.size>=10){setStatus('Đã chọn đủ 10 khách.','bad');return}const held=claim(c);if(!(held&&held.status==='holding'&&same(held.employeeName,employee()))&&!await ensureClaim(c))return;state.selected.set(k,c)}else{const rest=Array.from(state.selected.entries()).filter(([rk])=>rk!==k);state.selected.clear();state.selected.set(k,c);rest.forEach(([rk,rv])=>state.selected.set(rk,rv))}try{resetStaleCurrentCustomer();updateSelectedUI()}catch(_){ }renderPanel();await openSpecific(c)}
   function install(){if(!window.state||!window.database||!window.ROOT||!document.querySelector('.batch-panel'))return setTimeout(install,250);ensureBox();renderPanel();renderRows();if(typeof renderCustomers==='function'&&!renderCustomers.__v35wrapped){const old=renderCustomers;window.renderCustomers=function(){const r=old.apply(this,arguments);renderRows();return r};window.renderCustomers.__v35wrapped=true}database.ref(ROOT+'/customerClaims').on('value',snap=>{state.customerClaims=snap.val()||{};renderRows();renderPanel()});document.addEventListener('click',e=>{const z=e.target.closest&&e.target.closest('.row-zalo');const ph=e.target.closest&&e.target.closest('.phone-link');if(z||ph){const c=findCustomerFromRow(z||ph);const cl=c&&claim(c);if(cl&&terminal.has(cl.status)){e.preventDefault();e.stopImmediatePropagation();const si=statusInfo(cl);setStatus(si?si.badge:'Khách này đã được xử lý.','warn');return false}e.preventDefault();e.stopImmediatePropagation();selectAndOpen(c);return false}},true);const badge=$('selectedBadge');if(badge)new MutationObserver(()=>renderPanel()).observe(badge,{childList:true,subtree:true,characterData:true});$('operatorName')?.addEventListener('change',()=>setTimeout(()=>{renderPanel();renderRows()},20));$('operatorDepartment')?.addEventListener('change',()=>setTimeout(()=>{renderPanel();renderRows()},20));setMode(sendMode())}
+  function nativeMobileTap(e){
+    const a=e.target.closest?.('a.mobile-direct-zalo');
+    if(!a||!window.IDECO_V46?.isMobile())return;
+    e.stopImmediatePropagation();
+    const c=a.id==='v35Open'?current():(state.customers||[]).find(x=>key(x)===a.dataset.key);
+    const g=gate(c);
+    if(!g.ok||a.getAttribute('aria-disabled')==='true'){e.preventDefault();setStatus(g.msg||'Chưa chọn khách hàng.','bad');return;}
+    const held=claim(c);
+    if(!(held&&held.status==='holding'&&same(held.employeeName,employee()))){
+      e.preventDefault();
+      // A fresh tap is offered after the Firebase transaction; never skip claim validation.
+      mobileOpen(c).catch(err=>setStatus('Chưa mở được Zalo: '+(err.message||err),'bad'));
+      return;
+    }
+    const k=key(c);
+    if(!state.selected.has(k)&&state.selected.size>=10){e.preventDefault();setStatus('Đã chọn đủ 10 khách. Bỏ chọn một khách trước khi mở khách khác.','bad');return;}
+    const rest=Array.from(state.selected.entries()).filter(([id])=>id!==k);
+    state.selected.clear();state.selected.set(k,c);rest.forEach(([id,item])=>state.selected.set(id,item));
+    try{resetStaleCurrentCustomer();updateSelectedUI()}catch(_){}
+    a.href=window.IDECO_V46.mobileUrl(c);a.target='_top';
+    const notify=()=>{openedKey=key(c);renderPanel();setStatus('Đã yêu cầu mở Zalo. Kiểm tra đúng khách và xác nhận gửi trong Zalo.','ok')};
+    window.IDECO_V46.show(c,notify,false);notify();
+    // Keep the default navigation on this real anchor; no timer, await or synthetic click.
+  }
+  window.addEventListener('click',nativeMobileTap,true);
   window.IDECO_V35={openCurrent,openSpecific,finishCurrent,renderRows,renderPanel};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,160));else setTimeout(install,160);
 })();
@@ -4495,7 +4529,7 @@ body.v40-show-customize #v26Customize{display:block!important}
     try{
       const x=buildRows43();PARTNER_EXCEL_STATE.rows=x.rows;$('v43Save').disabled=!x.rows.length;
       const sample=x.rows.slice(0,10);const valid=x.rows.filter(c=>localMobilePhone(c.dienThoai)).length;
-      $('v43PreviewBox').innerHTML=`<table><thead><tr><th>Tên khách hàng</th><th>Người liên hệ</th><th>Điện thoại</th><th>Địa chỉ</th><th>Nhân viên</th></tr></thead><tbody>${sample.map(c=>`<tr><td>${esc43(c.tenKhachHang)}</td><td>${esc43(c.nguoiLienHe)}</td><td>${esc43(c.dienThoai)}</td><td>${esc43(c.diaChi)}</td><td>${esc43(c.nhanVien)}</td></tr>`).join('')}</tbody></table>`;
+      $('v43PreviewBox').innerHTML=`<table><thead><tr><th>Tên khách hàng</th><th>Người liên hệ</th><th>Điện thoại</th><th>Địa chỉ</th><th>Nhân viên</th></tr></thead><tbody>${sample.map(c=>`<tr><td>${esc43(c.tenKhachHang)}</td><td>${esc43(c.nguoiLienHe)}</td><td>${customerCallLink(c.dienThoai)}</td><td>${esc43(c.diaChi)}</td><td>${esc43(c.nhanVien)}</td></tr>`).join('')}</tbody></table>`;
       $('v43Summary').innerHTML=`✅ Đã chuẩn hóa <b>${x.rows.length}</b> khách · loại <b>${x.duplicatesRemoved}</b> dòng trùng trong file · <b>${valid}</b> SĐT di động hợp lệ. <b>${x.rows.filter(c=>c.nhanVien).length}</b> khách có nhân viên phụ trách. Các dòng thiếu/sai SĐT vẫn được lưu nhưng sẽ không chọn gửi Zalo.`;
       $('v43Status').textContent='Đã xem trước dữ liệu. Kiểm tra cột rồi bấm Lưu.';
     }catch(e){PARTNER_EXCEL_STATE.rows=[];$('v43Save').disabled=true;$('v43Status').textContent='❌ '+(e.message||e)}
@@ -4680,7 +4714,8 @@ body.v40-show-customize #v26Customize{display:block!important}
     <div class="v46-sheet-head"><h3 id="v46Title">Gửi Zalo trên điện thoại</h3><button id="v46Close" type="button" aria-label="Đóng">×</button></div>
     <div id="v46Customer"></div>
     <div class="v46-actions">
-      <a id="v46Open" target="_top" rel="noopener">📲 Mở Zalo của khách</a>
+      <a id="v46Open" target="_top" rel="noopener">📲 Mở ứng dụng Zalo của khách</a>
+      <a id="v48WebOpen" target="_top" rel="noopener">🔗 Mở bằng liên kết zalo.me</a>
       <button id="v46Share" type="button" disabled>📤 Chia sẻ ảnh → chọn Zalo</button>
       <button id="v46Download" type="button" disabled>⬇ Lưu ảnh để đính kèm Zalo</button>
       <button id="v47CopyPhone" type="button">📋 Sao chép SĐT khách</button>
@@ -4698,7 +4733,12 @@ body.v40-show-customize #v26Customize{display:block!important}
   const status=t=>{$('v46Status').textContent=t};
   function clearFile(){file=null;if(downloadUrl)URL.revokeObjectURL(downloadUrl);downloadUrl='';$('v46Share').disabled=true;$('v46Download').disabled=true;}
   function close(){generation++;$('v46Sheet').hidden=true;active=null;onOpened=null;clearFile();previousFocus?.focus?.();}
-  function mobileUrl(c){const p=localMobilePhone(c?.dienThoai);return p?'https://zalo.me/'+encodeURIComponent(p):'';}
+  function webMobileUrl(c){const p=localMobilePhone(c?.dienThoai);return p?'https://zalo.me/'+encodeURIComponent(p):'';}
+  function mobileUrl(c){
+    const web=webMobileUrl(c);if(!web)return '';
+    if(/Android/i.test(navigator.userAgent))return 'intent://zalo.me/'+encodeURIComponent(localMobilePhone(c.dienThoai))+'#Intent;scheme=https;package=com.zing.zalo;S.browser_fallback_url='+encodeURIComponent(web)+';end';
+    return web;
+  }
   function stillValid(){return active&&activeMode===window.IDECO_V41?.getMode()&&(state.customers||[]).some(c=>customerKey(c)===customerKey(active))&&operatorReady()&&(!window.IDECO_V28?.getClaim(active)||!['sent','blocked','unavailable'].includes(window.IDECO_V28.getClaim(active).status))&&(!window.IDECO_V28?.getClaim(active)?.employeeName||norm(window.IDECO_V28.getClaim(active).employeeName)===norm(state.operator.employeeName));}
   function ensureValid(){if(stillValid()&&preparedSignature===outputSignature())return true;status('Khách hoặc trạng thái phụ trách đã thay đổi. Đóng khung và chọn lại khách.');return false;}
   function canvasBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Không tạo được ảnh gửi.')),'image/png'));}
@@ -4708,14 +4748,14 @@ body.v40-show-customize #v26Customize{display:block!important}
   }
   function outputSignature(){return JSON.stringify([localStorage.getItem('ideco_zalo_send_mode_v29'),window.IDECO_V26?.getConfig(),state.image?.dataUrl,active?customerMessage(active):'']);}
   let preparedSignature='';
-  async function show(c,callback){
+  async function show(c,callback,autoOpen=false){
     const url=mobileUrl(c);if(!url)return;
     const ticket=++generation;clearFile();previousFocus=document.activeElement;active=c;activeMode=window.IDECO_V41?.getMode();onOpened=callback;sharing=false;preparedSignature=outputSignature();
     $('v46Customer').textContent=(c.tenKhachHang||'Khách hàng')+' · '+localMobilePhone(c.dienThoai);
-    $('v46Open').href=url;$('v46Sheet').hidden=false;$('v46Close').focus();
+    $('v46Open').href=url;$('v48WebOpen').href=webMobileUrl(c);$('v46Sheet').hidden=false;$('v46Close').focus();
     status('Bấm Mở Zalo của khách để chuyển sang Zalo. Ảnh đang được chuẩn bị…');
     // Launch only during a live tap; after a Firebase wait the visible link supplies a fresh gesture.
-    if(navigator.userActivation?.isActive&&stillValid())$('v46Open').click();
+    if(autoOpen&&navigator.userActivation?.isActive!==false&&stillValid())$('v46Open').click();
     try{
       const blob=await prepare(c);if(ticket!==generation)return;if(preparedSignature!==outputSignature()){show(c,callback);return;}
       file=new File([blob],'IDECO_'+localMobilePhone(c.dienThoai)+'.png',{type:'image/png'});downloadUrl=URL.createObjectURL(file);$('v46Download').disabled=false;
@@ -4732,6 +4772,7 @@ body.v40-show-customize #v26Customize{display:block!important}
   $('v46Close').addEventListener('click',close);
   $('v46Sheet').addEventListener('click',e=>{if(e.target===$('v46Sheet'))close()});
   document.addEventListener('keydown',e=>{if($('v46Sheet').hidden)return;if(e.key==='Escape')close();if(e.key==='Tab'){const a=Array.from($('v46Sheet').querySelectorAll('button:not(:disabled),a[href]'));const first=a[0],last=a[a.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}});
+  $('v48WebOpen').addEventListener('click',e=>{if(!ensureValid()){e.preventDefault();return;}onOpened?.();});
   $('v46Open').addEventListener('click',e=>{if(!ensureValid()){e.preventDefault();return;}onOpened?.();status('Điện thoại sẽ xử lý liên kết Zalo của khách. Nếu đã đăng nhập trong ứng dụng, anh tiếp tục dùng tài khoản đó để gửi.');});
   $('v46Share').addEventListener('click',async()=>{
     if(!file||sharing||!ensureValid())return;const ticket=generation,notify=onOpened;sharing=true;
@@ -4748,5 +4789,37 @@ body.v40-show-customize #v26Customize{display:block!important}
 })();
 </script>
 
+<style>
+a.mobile-direct-zalo{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;box-sizing:border-box;cursor:pointer;min-height:44px}
+a.mobile-direct-zalo[aria-disabled="true"]{opacity:.5}
+#v48WebOpen{background:#e0ecff;color:#0758bb}
+</style>
+<script id="ideco-v48-native-controls">
+(function(){
+  function update(){
+    if(!window.IDECO_V46?.isMobile())return;
+    document.querySelectorAll('button.row-zalo,button.open-zalo,button#v35Open').forEach(b=>{
+      const a=document.createElement('a');
+      for(const attr of b.attributes)if(!['type','disabled'].includes(attr.name))a.setAttribute(attr.name,attr.value);
+      a.classList.add('mobile-direct-zalo');a.innerHTML=b.innerHTML;a.target='_top';
+      a.setAttribute('aria-disabled',b.disabled?'true':'false');b.replaceWith(a);
+    });
+    document.querySelectorAll('a.mobile-direct-zalo').forEach(a=>{
+      let c;
+      if(a.id==='v35Open')c=Array.from(state.selected.values()).find(c=>!['sent','blocked','unavailable'].includes(window.IDECO_V28?.getClaim(c)?.status));
+      else c=(state.customers||[]).find(c=>customerKey(c)===a.dataset.key);
+      const href=c?IDECO_V46.mobileUrl(c):'';
+      const cl=c&&window.IDECO_V28?.getClaim(c);
+      const disabled=!href||['sent','blocked','unavailable'].includes(cl?.status);
+      const ar=disabled?'true':'false';if(a.getAttribute('aria-disabled')!==ar)a.setAttribute('aria-disabled',ar);
+      if(href&&a.getAttribute('href')!==href)a.setAttribute('href',href);
+      if(!href&&a.hasAttribute('href'))a.removeAttribute('href');
+    });
+  }
+  let queued=false;
+  const observer=new MutationObserver(()=>{if(queued)return;queued=true;queueMicrotask(()=>{queued=false;update()})});
+  observer.observe(document.body,{childList:true,subtree:true});update();
+})();
+</script>
 </body>
 </html>
