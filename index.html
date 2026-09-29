@@ -298,6 +298,9 @@ tbody tr:hover td{background:#fff3f3}
 .manual-v22-chip{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:800;background:#e8f1ff;color:#0d47a1;border:1px solid #c7dcff}
 @media(max-width:700px){#v22ManualSend .v22-actions button{flex:1 1 calc(50% - 8px)}}
 </style>
+<style id="ideco-v47-call-style">
+.customer-call{display:inline-flex;align-items:center;min-height:44px;color:#0068ff!important;font-weight:800;text-decoration:underline;touch-action:manipulation}
+</style>
 </head>
 <body>
 <div id="loginGate">
@@ -758,6 +761,18 @@ function toast(msg, ms=4200){
 function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
 function norm(v){return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().replace(/\s+/g,' ').trim();}
 function cleanPhone(v){return String(v??'').replace(/[^\d+]/g,'').trim();}
+function customerCallLink(value, extraClass=''){
+  const raw=String(value??'').trim();
+  const links=raw.split(/\s*(?:[;/|,]|\n)\s*/).filter(Boolean).map(part=>{
+    let d=part.replace(/[\s().-]/g,'');
+    if(/^0084\d+$/.test(d))d='+'+d.slice(2);
+    if(/^84\d{9,10}$/.test(d))d='+'+d;
+    if(/^[35789]\d{8}$/.test(d))d='0'+d;
+    if(!/^(?:0\d{9,10}|\+[1-9]\d{7,14})$/.test(d))return esc(part);
+    return '<a class="customer-call '+esc(extraClass)+'" href="tel:'+esc(d)+'" title="Gọi '+esc(part)+'">'+esc(part)+'</a>';
+  });
+  return links.join(' / ');
+}
 function localMobilePhone(v){
   let d=String(v??'').replace(/\D/g,'');
   if(!d)return '';
@@ -1276,7 +1291,7 @@ function renderCustomers(){
       </label></td>
       <td class="customer-name">${esc(c.tenKhachHang||'')}${c._source==='manual'?'<span class="manual-source-badge">THỦ CÔNG</span>':''}</td>
       <td>${esc(c.nguoiLienHe||'')}${c.nguoiLienHe?`<span class="ai-salute-badge">${esc(salutationForCustomer(c))}</span>`:''}</td>
-      <td>${p?`<a class="phone-link" href="https://zalo.me/${esc(p)}" target="_blank" rel="noopener">${esc(c.dienThoai||'')}</a>`:esc(c.dienThoai||'')}</td>
+      <td>${customerCallLink(c.dienThoai)}</td>
       <td>${map?`<a class="map-link" href="${map}" data-map-address="${esc(c.diaChi||'')}" data-map-name="${esc(c.tenKhachHang||'')}" title="Xem bản đồ ngay trong ứng dụng: ${esc(c.diaChi||'')}">${esc(c.diaChi||'')}</a>`:esc(c.diaChi||'')}</td>
       <td class="staff">${esc(c.nhanVien||'')}</td>
       <td class="action-cell"><button class="row-zalo" data-key="${esc(key)}" ${p?'':'disabled'}>📱 Zalo</button></td>
@@ -2438,13 +2453,6 @@ $('deleteAllCustomers').addEventListener('click',deleteAllCustomers);
     let w=null;try{w=window.open('https://zalo.me/'+encodeURIComponent(p),'_blank','noopener')}catch(_){w=null}
     if(!w){setStatus('Trình duyệt đã chặn cửa sổ Zalo. Hãy cho phép pop-up rồi thử lại.','bad');toast('⚠️ Không mở được Zalo vì pop-up bị chặn.',5500);await report(c,'failed','Trình duyệt chặn cửa sổ Zalo',false);return}
     setStatus(`Đã mở Zalo theo SĐT ${p}.${copyTextToo?' Thư đã được copy — sang Zalo kiểm tra đúng người rồi Ctrl+V để dán thư.':''}\nSau đó quay lại bấm “Copy ảnh”, sang Zalo Ctrl+V để dán banner.`,'ok');await report(c,'opened','Đã mở liên kết Zalo thủ công',false)
-  }
-  async function mobileOpen(c){
-    const g=gate(c);if(!g.ok){setStatus(g.msg,'bad');toast(g.msg,4500);return;}
-    const sourceMode=window.IDECO_V41?.getMode();
-    if(!await ensureClaim(c))return;
-    if(sourceMode!==window.IDECO_V41?.getMode()||!(state.customers||[]).some(x=>key(x)===key(c))){state.selected.delete(key(c));updateSelectedUI();return;}
-    window.IDECO_V46.show(c,()=>{openedKey=key(c);renderPanel();setStatus('Đã yêu cầu mở/chia sẻ qua Zalo. Kiểm tra đúng người nhận và bấm Gửi trong Zalo; sau đó quay lại xác nhận ĐÃ GỬI.','ok')});
   }
   async function openCurrent(){const c=current();if(c)await openCustomer(c,true)}
   async function copyLetter(){const c=current();if(c)await copyTextValue(customerMessage(c))}
@@ -3733,11 +3741,19 @@ body.v29-image-only #v29ImageOnlyNote{display:block}
     $('v35Mode').value=sendMode();$('v35Mode').addEventListener('change',e=>setMode(e.target.value));$('v35Open').addEventListener('click',()=>openCurrent(true));$('v35SentNext').addEventListener('click',()=>finishCurrent('sent'));$('v35Unavailable').addEventListener('click',()=>finishCurrent('unavailable'));$('v35Blocked').addEventListener('click',()=>finishCurrent('blocked'));
     return true;
   }
-  function renderPanel(){if(!$('v35SimpleSend'))return;const a=queue(),c=a[0],cur=$('v35Current'),count=$('v35Count');count.textContent=a.length?`1/${a.length}`:'0/0';if(!c){cur.innerHTML='<div class="v35-name">Chưa chọn khách hàng</div><div class="v35-meta">Tích chọn 1–10 khách ở bảng bên dưới. Hệ thống xử lý đúng theo thứ tự đã chọn.</div>';['v35Open','v35SentNext','v35Unavailable','v35Blocked'].forEach(id=>$(id).disabled=true);openedKey='';return}const p=phone(c),cl=claim(c);cur.innerHTML=`<div class="v35-name">${esc35(c.tenKhachHang||'Khách hàng')}</div><div class="v35-meta">Người liên hệ: <b>${esc35(c.nguoiLienHe||'—')}</b> · Nhân viên gửi: <b>${esc35(employee()||'—')}</b></div><span class="v35-phone">${esc35(p||c.dienThoai||'—')}</span>${cl&&cl.status==='holding'?`<div class="v35-meta">🔒 Đang giữ khách cho ${esc35(cl.employeeName||employee())}</div>`:''}`;$('v35Open').disabled=!p;$('v35SentNext').disabled=!p||openedKey!==key(c);$('v35Unavailable').disabled=!p;$('v35Blocked').disabled=!p;$('v35Mode').value=sendMode();try{updateMessagePreview(c)}catch(_){ }}
+  function renderPanel(){if(!$('v35SimpleSend'))return;const a=queue(),c=a[0],cur=$('v35Current'),count=$('v35Count');count.textContent=a.length?`1/${a.length}`:'0/0';if(!c){cur.innerHTML='<div class="v35-name">Chưa chọn khách hàng</div><div class="v35-meta">Tích chọn 1–10 khách ở bảng bên dưới. Hệ thống xử lý đúng theo thứ tự đã chọn.</div>';['v35Open','v35SentNext','v35Unavailable','v35Blocked'].forEach(id=>$(id).disabled=true);openedKey='';return}const p=phone(c),cl=claim(c);cur.innerHTML=`<div class="v35-name">${esc35(c.tenKhachHang||'Khách hàng')}</div><div class="v35-meta">Người liên hệ: <b>${esc35(c.nguoiLienHe||'—')}</b> · Nhân viên gửi: <b>${esc35(employee()||'—')}</b></div>${customerCallLink(p||c.dienThoai||'—','v35-phone')}${cl&&cl.status==='holding'?`<div class="v35-meta">🔒 Đang giữ khách cho ${esc35(cl.employeeName||employee())}</div>`:''}`;$('v35Open').disabled=!p;$('v35SentNext').disabled=!p||openedKey!==key(c);$('v35Unavailable').disabled=!p;$('v35Blocked').disabled=!p;$('v35Mode').value=sendMode();try{updateMessagePreview(c)}catch(_){ }}
   async function copyPayload(c){if(sendMode()==='image'){if(typeof startClipboardWrite==='function')return startClipboardWrite();throw new Error('Bộ copy ảnh chưa sẵn sàng.')}if(window.IDECO_V23&&typeof IDECO_V23.renderCardCanvas==='function'&&navigator.clipboard&&window.ClipboardItem){const canvas=await IDECO_V23.renderCardCanvas(c);const blob=await new Promise((res,rej)=>canvas.toBlob(b=>b?res(b):rej(new Error('Không tạo được ảnh')),'image/png',.96));return navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);}if(typeof copyTextValue==='function')return copyTextValue(customerMessage(c));throw new Error('Bộ chuẩn bị nội dung chưa sẵn sàng.')}
   function webUrl(c){const p=phone(c);return 'https://chat.zalo.me/?phone='+encodeURIComponent(p)+'&openConv=true'}
   function openWindowFor(c,reuse=null){let w=reuse;try{if(!w||w.closed)w=window.open('about:blank','IDECO_ZALO_ACTIVE');if(w){w.location.href=webUrl(c);try{w.focus()}catch(_){ }activeWindow=w;return w}}catch(_){ }return null}
   async function ensureClaim(c){const cl=claim(c),me=employee();if(cl&&cl.employeeName&&same(cl.employeeName,me)&&cl.status==='holding')return true;if(window.IDECO_V28&&typeof IDECO_V28.claimCustomer==='function'){const r=await IDECO_V28.claimCustomer(c);if(!r||!r.ok)return false;try{state.selected.set(key(c),c);updateSelectedUI()}catch(_){ }return true}return true}
+  async function mobileOpen(c){
+    const g=gate(c);if(!g.ok){setStatus(g.msg,'bad');toast(g.msg,4500);return;}
+    const sourceMode=window.IDECO_V41?.getMode();
+    const held=claim(c);
+    if(!(held&&held.status==='holding'&&same(held.employeeName,employee()))&&!await ensureClaim(c))return;
+    if(sourceMode!==window.IDECO_V41?.getMode()||!(state.customers||[]).some(x=>key(x)===key(c))){state.selected.delete(key(c));updateSelectedUI();return;}
+    window.IDECO_V46.show(c,()=>{openedKey=key(c);renderPanel();setStatus('Đã yêu cầu mở/chia sẻ qua Zalo. Kiểm tra đúng người nhận và bấm Gửi trong Zalo; sau đó quay lại xác nhận ĐÃ GỬI.','ok')});
+  }
   async function openSpecific(c){if(window.IDECO_V46?.isMobile())return mobileOpen(c);if(!c)return;const g=gate(c);if(!g.ok){setStatus(g.msg,'bad');try{toast('⚠️ '+esc35(g.msg),5000)}catch(_){ }return}if(!await ensureClaim(c))return;let cp;try{cp=copyPayload(c)}catch(e){cp=Promise.reject(e)}const w=openWindowFor(c);if(!w){setStatus('Trình duyệt chặn cửa sổ Zalo. Hãy cho phép pop-up cho trang này.','bad');return}openedKey=key(c);renderPanel();setStatus('Đang mở Zalo theo SĐT '+g.phone+'… Nội dung cũng đang được chuẩn bị tự động.','warn');try{await cp;setStatus('✅ Đã mở Zalo cho '+(c.tenKhachHang||g.phone)+' · '+g.phone+' và đã chuẩn bị '+(sendMode()==='image'?'ẢNH':'ẢNH + THƯ')+'.\nKiểm tra đúng tên/SĐT trên Zalo → Ctrl+V → Gửi → quay lại chỉ bấm “ĐÃ GỬI → KHÁCH TIẾP THEO”.','ok')}catch(e){setStatus('✅ Đã mở Zalo cho '+(c.tenKhachHang||g.phone)+'.\n⚠️ Chưa tự copy được nội dung: '+(e&&e.message||e)+'. Có thể bấm lại “MỞ ZALO KHÁCH NÀY”.','warn')}}
   async function openCurrent(){const c=current();if(c)await openSpecific(c);else setStatus('Chưa chọn khách hàng.','bad')}
   async function writeTerminal(c,status){if(!c)return{ok:false};if(status==='sent'&&window.IDECO_V28&&typeof IDECO_V28.markCustomerSent==='function')return IDECO_V28.markCustomerSent(c);const me=employee(),id=window.IDECO_V28&&IDECO_V28.claimId?IDECO_V28.claimId(c):'';if(!id||!me)return{ok:false};const ref=database.ref(ROOT+'/customerClaims/'+id);let conflict=null;try{const r=await ref.transaction(cur=>{if(cur&&cur.status==='sent'){conflict=cur;return}if(cur&&cur.employeeName&&!same(cur.employeeName,me)){conflict=cur;return}const base=cur||{};return Object.assign({},base,{employeeName:me,department:String(state.operator.department||base.department||''),sendDate:String(state.operator.sendDate||base.sendDate||''),customerName:String(c.tenKhachHang||base.customerName||''),contactName:String(c.nguoiLienHe||base.contactName||''),phone:phone(c)||base.phone||'',sourceKey:key(c)||base.sourceKey||'',status,processedBy:me,processedAt:firebase.database.ServerValue.TIMESTAMP,updatedAt:firebase.database.ServerValue.TIMESTAMP})});if(!r.committed){if(typeof toast==='function')toast('⚠️ Không cập nhật được vì khách đã có trạng thái bởi '+esc35(conflict&&(conflict.sentBy||conflict.employeeName)||'nhân viên khác')+'.',5500);return{ok:false,conflict}}return{ok:true,claim:r.snapshot&&r.snapshot.val?r.snapshot.val():null}}catch(e){if(typeof toast==='function')toast('❌ Firebase chưa cập nhật: '+esc35(e&&e.message||e),6000);return{ok:false,error:e}}}
@@ -3748,7 +3764,7 @@ body.v29-image-only #v29ImageOnlyNote{display:block}
   function statusInfo(cl){if(!cl)return null;if(cl.status==='sent')return{cls:'sent',row:'v35-sent-row',badge:'✅ ĐÃ GỬI ZALO · '+(cl.sentBy||cl.employeeName||'NV'),meta:(cl.department?cl.department+' · ':'')+(cl.sentAt?'gửi '+fmt(cl.sentAt):(cl.sendDate?'ngày '+cl.sendDate:''))};if(cl.status==='unavailable')return{cls:'unavailable',row:'v35-unavailable-row',badge:'⚠️ KHÔNG TÌM THẤY / CHƯA KẾT BẠN · '+(cl.processedBy||cl.employeeName||'NV'),meta:(cl.department?cl.department+' · ':'')+(cl.processedAt?'cập nhật '+fmt(cl.processedAt):(cl.sendDate?'ngày '+cl.sendDate:''))};if(cl.status==='blocked')return{cls:'blocked',row:'v35-blocked-row',badge:'⛔ BỊ CHẶN / KHÔNG THỂ NHẮN · '+(cl.processedBy||cl.employeeName||'NV'),meta:(cl.department?cl.department+' · ':'')+(cl.processedAt?'cập nhật '+fmt(cl.processedAt):(cl.sendDate?'ngày '+cl.sendDate:''))};return null}
   function renderRows(){clearTimeout(renderTimer);renderTimer=setTimeout(()=>{const body=$('customerBody');if(!body||!window.state)return;body.querySelectorAll('tr[data-key]').forEach(tr=>{tr.classList.remove('v35-sent-row','v35-unavailable-row','v35-blocked-row');tr.querySelectorAll('.v35-status-badge,.v35-status-meta,.v35-customer-status').forEach(x=>x.remove());const c=(state.customers||[]).find(x=>key(x)===tr.dataset.key);if(!c)return;const cl=claim(c),si=statusInfo(cl);if(!si)return;tr.classList.add(si.row);const cb=tr.querySelector('.pick-checkbox');if(cb){cb.checked=false;cb.disabled=true}const z=tr.querySelector('.row-zalo');if(z)z.disabled=true;const pick=tr.querySelector('.pick-wrap span:last-child');if(pick)pick.textContent=cl.status==='sent'?'Đã gửi':'Đã xử lý';const staff=tr.querySelector('td.staff')||tr.children[5];if(staff){staff.querySelectorAll('.claim-badge-v28,.claim-meta-v28,.claim-release-v28,.sent-badge-v33,.sent-meta-v33').forEach(x=>x.remove());const b=document.createElement('span');b.className='v35-status-badge '+si.cls;b.textContent=si.badge;staff.appendChild(b);const m=document.createElement('span');m.className='v35-status-meta';m.textContent=si.meta;staff.appendChild(m)}const name=tr.querySelector('.customer-name');if(name){const s=document.createElement('span');s.className='v35-customer-status '+si.cls;s.textContent=cl.status==='sent'?'✓ Đã gửi — '+(cl.sentBy||cl.employeeName||'NV'):cl.status==='unavailable'?'⚠ Chưa kết bạn/không tìm thấy — '+(cl.processedBy||cl.employeeName||'NV'):'⛔ Không thể nhắn — '+(cl.processedBy||cl.employeeName||'NV');name.appendChild(s)}})},15)}
   function findCustomerFromRow(el){const tr=el&&el.closest&&el.closest('tr[data-key]');if(!tr)return null;return (state.customers||[]).find(c=>key(c)===tr.dataset.key)||null}
-  async function selectAndOpen(c){if(!c)return;const g=gate(c);if(!g.ok){setStatus(g.msg,'bad');try{toast('⚠️ '+esc35(g.msg),5500)}catch(_){ }return}const k=key(c);if(!state.selected.has(k)){if(state.selected.size>=10){setStatus('Đã chọn đủ 10 khách.','bad');return}if(!await ensureClaim(c))return;state.selected.set(k,c)}else{const rest=Array.from(state.selected.entries()).filter(([rk])=>rk!==k);state.selected.clear();state.selected.set(k,c);rest.forEach(([rk,rv])=>state.selected.set(rk,rv))}try{resetStaleCurrentCustomer();updateSelectedUI()}catch(_){ }renderPanel();await openSpecific(c)}
+  async function selectAndOpen(c){if(!c)return;const g=gate(c);if(!g.ok){setStatus(g.msg,'bad');try{toast('⚠️ '+esc35(g.msg),5500)}catch(_){ }return}const k=key(c);if(!state.selected.has(k)){if(state.selected.size>=10){setStatus('Đã chọn đủ 10 khách.','bad');return}const held=claim(c);if(!(held&&held.status==='holding'&&same(held.employeeName,employee()))&&!await ensureClaim(c))return;state.selected.set(k,c)}else{const rest=Array.from(state.selected.entries()).filter(([rk])=>rk!==k);state.selected.clear();state.selected.set(k,c);rest.forEach(([rk,rv])=>state.selected.set(rk,rv))}try{resetStaleCurrentCustomer();updateSelectedUI()}catch(_){ }renderPanel();await openSpecific(c)}
   function install(){if(!window.state||!window.database||!window.ROOT||!document.querySelector('.batch-panel'))return setTimeout(install,250);ensureBox();renderPanel();renderRows();if(typeof renderCustomers==='function'&&!renderCustomers.__v35wrapped){const old=renderCustomers;window.renderCustomers=function(){const r=old.apply(this,arguments);renderRows();return r};window.renderCustomers.__v35wrapped=true}database.ref(ROOT+'/customerClaims').on('value',snap=>{state.customerClaims=snap.val()||{};renderRows();renderPanel()});document.addEventListener('click',e=>{const z=e.target.closest&&e.target.closest('.row-zalo');const ph=e.target.closest&&e.target.closest('.phone-link');if(z||ph){const c=findCustomerFromRow(z||ph);const cl=c&&claim(c);if(cl&&terminal.has(cl.status)){e.preventDefault();e.stopImmediatePropagation();const si=statusInfo(cl);setStatus(si?si.badge:'Khách này đã được xử lý.','warn');return false}e.preventDefault();e.stopImmediatePropagation();selectAndOpen(c);return false}},true);const badge=$('selectedBadge');if(badge)new MutationObserver(()=>renderPanel()).observe(badge,{childList:true,subtree:true,characterData:true});$('operatorName')?.addEventListener('change',()=>setTimeout(()=>{renderPanel();renderRows()},20));$('operatorDepartment')?.addEventListener('change',()=>setTimeout(()=>{renderPanel();renderRows()},20));setMode(sendMode())}
   window.IDECO_V35={openCurrent,openSpecific,finishCurrent,renderRows,renderPanel};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,160));else setTimeout(install,160);
@@ -4103,7 +4119,7 @@ body.v36-show-customize #v36ToggleCustomize{border-color:#8b5cf6;background:#f5f
     $('selectedList').innerHTML=arr.length ? arr.map((c,i)=>{
       const k=customerKey(c);
       const salute=(typeof salutationForCustomer==='function' ? salutationForCustomer(c) : 'Anh/Chị');
-      return `<li><div><b>${i+1}.</b> ${esc(c.tenKhachHang||'Khách hàng')} · <span class="v39-phone">${esc(c.dienThoai||'')}</span>${c.nguoiLienHe?` · <span class="ai-salute-badge">${esc(salute)} ${esc(c.nguoiLienHe)}</span>`:''}</div><div class="v39-action-row"><button class="mini-btn copy-msg" data-key="${esc(k)}">📋 Lời chào</button><button class="mini-btn img copy-img">🖼 Ảnh</button><button class="mini-btn zalo open-zalo" data-key="${esc(k)}">📱 Gửi Zalo khách này</button></div></li>`;
+      return `<li><div><b>${i+1}.</b> ${esc(c.tenKhachHang||'Khách hàng')} · ${customerCallLink(c.dienThoai,'v39-phone')}${c.nguoiLienHe?` · <span class="ai-salute-badge">${esc(salute)} ${esc(c.nguoiLienHe)}</span>`:''}</div><div class="v39-action-row"><button class="mini-btn copy-msg" data-key="${esc(k)}">📋 Lời chào</button><button class="mini-btn img copy-img">🖼 Ảnh</button><button class="mini-btn zalo open-zalo" data-key="${esc(k)}">📱 Gửi Zalo khách này</button></div></li>`;
     }).join('') : '<li class="muted">Chưa chọn khách hàng.</li>';
   }
   function install(){
@@ -4664,9 +4680,10 @@ body.v40-show-customize #v26Customize{display:block!important}
     <div class="v46-sheet-head"><h3 id="v46Title">Gửi Zalo trên điện thoại</h3><button id="v46Close" type="button" aria-label="Đóng">×</button></div>
     <div id="v46Customer"></div>
     <div class="v46-actions">
-      <a id="v46Open" target="_blank" rel="noopener">📲 Mở Zalo của khách</a>
+      <a id="v46Open" target="_top" rel="noopener">📲 Mở Zalo của khách</a>
       <button id="v46Share" type="button" disabled>📤 Chia sẻ ảnh → chọn Zalo</button>
       <button id="v46Download" type="button" disabled>⬇ Lưu ảnh để đính kèm Zalo</button>
+      <button id="v47CopyPhone" type="button">📋 Sao chép SĐT khách</button>
       <button id="v46Copy" type="button">📋 Sao chép lời nhắn</button>
     </div>
     <div id="v46Status" role="status" aria-live="polite"></div>
@@ -4695,7 +4712,10 @@ body.v40-show-customize #v26Customize{display:block!important}
     const url=mobileUrl(c);if(!url)return;
     const ticket=++generation;clearFile();previousFocus=document.activeElement;active=c;activeMode=window.IDECO_V41?.getMode();onOpened=callback;sharing=false;preparedSignature=outputSignature();
     $('v46Customer').textContent=(c.tenKhachHang||'Khách hàng')+' · '+localMobilePhone(c.dienThoai);
-    $('v46Open').href=url;$('v46Sheet').hidden=false;$('v46Close').focus();status('Đang chuẩn bị ảnh theo khách đã chọn…');
+    $('v46Open').href=url;$('v46Sheet').hidden=false;$('v46Close').focus();
+    status('Bấm Mở Zalo của khách để chuyển sang Zalo. Ảnh đang được chuẩn bị…');
+    // Launch only during a live tap; after a Firebase wait the visible link supplies a fresh gesture.
+    if(navigator.userActivation?.isActive&&stillValid())$('v46Open').click();
     try{
       const blob=await prepare(c);if(ticket!==generation)return;if(preparedSignature!==outputSignature()){show(c,callback);return;}
       file=new File([blob],'IDECO_'+localMobilePhone(c.dienThoai)+'.png',{type:'image/png'});downloadUrl=URL.createObjectURL(file);$('v46Download').disabled=false;
@@ -4704,6 +4724,11 @@ body.v40-show-customize #v26Customize{display:block!important}
       status(supported?'Ảnh đã sẵn sàng. Bấm Chia sẻ ảnh → chọn Zalo → chọn đúng khách → Gửi.':'Trình duyệt này chưa hỗ trợ chia sẻ ảnh trực tiếp. Bấm Lưu ảnh, rồi mở Zalo và đính kèm ảnh.');
     }catch(e){if(ticket===generation)status('Chưa tạo được ảnh: '+(e.message||e)+'. Anh vẫn có thể sao chép lời nhắn và mở Zalo.');}
   }
+  $('v47CopyPhone').addEventListener('click',async()=>{
+    if(!ensureValid())return;
+    try{const ok=await copyTextValue(localMobilePhone(active.dienThoai));status(ok===false?'Chưa sao chép được SĐT.':'Đã sao chép SĐT. Có thể dán vào ô tìm kiếm trong Zalo.');}
+    catch(_){status('Chưa sao chép được SĐT.');}
+  });
   $('v46Close').addEventListener('click',close);
   $('v46Sheet').addEventListener('click',e=>{if(e.target===$('v46Sheet'))close()});
   document.addEventListener('keydown',e=>{if($('v46Sheet').hidden)return;if(e.key==='Escape')close();if(e.key==='Tab'){const a=Array.from($('v46Sheet').querySelectorAll('button:not(:disabled),a[href]'));const first=a[0],last=a[a.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}});
