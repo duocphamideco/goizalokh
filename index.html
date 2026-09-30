@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>IDECO V48 — Zalo mobile và gọi điện trực tiếp</title>
+<title>IDECO V50 — Zalo mobile và gọi điện trực tiếp</title>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -301,21 +301,47 @@ tbody tr:hover td{background:#fff3f3}
 <style id="ideco-v47-call-style">
 .customer-call{display:inline-flex;align-items:center;min-height:44px;color:#0068ff!important;font-weight:800;text-decoration:underline;touch-action:manipulation}
 </style>
-<script id="ideco-v48-call-routing">
-window.addEventListener('click',function(e){
-  const a=e.target.closest?.('a.customer-call[href^="tel:"]');
-  if(!a)return;
-  a.target='_top';
-  e.stopImmediatePropagation();
-  // Do not preventDefault: the real user tap launches the system telephone handler.
-},true);
+<script id="ideco-v49-phone-routing">
+(function(){
+  let timer=0, pending=null;
+  function hide(){clearTimeout(timer);pending=null;document.getElementById('v49LaunchHelp')?.remove();}
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)hide()});
+  window.addEventListener('pagehide',hide);
+  function watch(kind,number,url){
+    hide();pending={kind,number,url};
+    timer=setTimeout(()=>{
+      if(!pending||document.hidden)return;
+      const box=document.createElement('div');box.id='v49LaunchHelp';
+      box.style.cssText='position:fixed;bottom:12px;left:12px;right:12px;max-width:540px;margin:auto;z-index:2147483647;background:white;color:#172554;border:2px solid #0068ff;border-radius:12px;padding:16px;box-shadow:0 8px 30px #0004;font:14px Arial;line-height:1.5';
+      const msg=document.createElement('p');msg.textContent=kind==='call'?'Nếu màn hình gọi chưa mở, anh thử nút bên dưới.':'Nếu Zalo chưa mở đúng khách, anh sao chép SĐT để tìm khách trong Zalo.';box.appendChild(msg);
+      const link=document.createElement('a');link.textContent=kind==='call'?'📞 Mở bàn phím gọi':'📲 Thử mở Zalo';link.target='_self';link.href=kind==='call'&&/Android/i.test(navigator.userAgent)?'intent:'+number+'#Intent;scheme=tel;action=android.intent.action.DIAL;end':url;
+      link.style.cssText='display:inline-block;padding:10px;background:#0068ff;color:white;border-radius:6px;margin:4px';box.appendChild(link);
+      const cp=document.createElement('button');cp.textContent='Sao chép SĐT';cp.style.cssText='padding:10px;margin:4px';cp.onclick=async()=>{try{const ok=await copyTextValue(number);cp.textContent=ok===false?'Chưa sao chép được':'Đã sao chép';}catch(_){cp.textContent=number}};box.appendChild(cp);
+      const note=document.createElement('p');note.textContent='Nếu vẫn không mở: mở website trực tiếp bằng Chrome, thay vì màn hình xem trước tệp hoặc trình duyệt bên trong ứng dụng.';box.appendChild(note);
+      const close=document.createElement('button');close.textContent='Đóng';close.onclick=hide;box.appendChild(close);document.body.appendChild(box);
+    },1800);
+  }
+  function launch(url,kind,number){
+    if(!/^(tel:\+?\d+|zalo:\/\/conversation\?phone=\d+)$/.test(url))return false;
+    watch(kind,number,url);
+    // Synchronous navigation in the current frame, directly inside the user's tap.
+    // No top-frame redirect, package intent, store URL or timed app launch.
+    try{window.location.assign(url);return true;}catch(_){return false;}
+  }
+  window.IDECO_V49={launch,watch};
+  window.addEventListener('click',function(e){
+    const a=e.target.closest?.('a.customer-call[href^="tel:"]');if(!a)return;
+    const url=a.getAttribute('href');if(!/^tel:\+?\d+$/.test(url))return;
+    e.preventDefault();e.stopImmediatePropagation();launch(url,'call',url.slice(4));
+  },true);
+})();
 </script>
 </head>
-<body>
+<body><div style="position:fixed;right:8px;bottom:3px;z-index:999;background:#ecfdf5;color:#166534;padding:3px 7px;border-radius:4px;font:11px Arial;pointer-events:none">IDECO V50</div>
 <div id="loginGate">
   <div class="login-card">
     <div class="logo-mark"><div class="logo-icon">◆</div><span>iDECO</span></div>
-    <h1>ỨNG DỤNG PHÁT TRIỂN KHÁCH HÀNG</h1><span id="idecoBuild48" style="display:inline-block;background:#dcfce7;color:#166534;padding:5px 9px;border-radius:6px;font-size:12px;font-weight:800">V48 · Zalo mobile / Bấm SĐT để gọi</span>
+    <h1>ỨNG DỤNG PHÁT TRIỂN KHÁCH HÀNG</h1><span id="idecoBuild50" style="display:inline-block;background:#dcfce7;color:#166534;padding:5px 9px;border-radius:6px;font-size:12px;font-weight:800">V50 · Liên hệ nhanh trên điện thoại</span>
     <p>Danh sách khách hàng · Ảnh chương trình · Gửi Zalo tuần tự</p>
     <div class="login-mission">
       <div class="mission-main">TÌM KIẾM - CHINH PHỤC KHÁCH HÀNG HỢP TÁC LÀ CÁCH THỂ HIỆN NĂNG LỰC CỐT LÕI TRONG KINH DOANH - BÁN HÀNG</div>
@@ -760,6 +786,10 @@ const state = {
   batch: {running:false,busy:false,paused:false,runId:0,queue:[],index:0,timer:null,countdown:null,zaloWindow:null,zaloWindows:[],multiTab:false,current:null,mode:'pc_helper',results:[],opened:0,skipped:0,failed:0,preparedCount:0,helperScript:'',helperName:'',reportId:''}
 };
 
+// Share the same application objects with the extensions before they initialize.
+window.state=state;
+window.database=database;
+window.ROOT=ROOT;
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 
@@ -778,7 +808,7 @@ function customerCallLink(value, extraClass=''){
     if(/^84\d{9,10}$/.test(d))d='+'+d;
     if(/^[35789]\d{8}$/.test(d))d='0'+d;
     if(!/^(?:0\d{9,10}|\+[1-9]\d{7,14})$/.test(d))return esc(part);
-    return '<a class="customer-call '+esc(extraClass)+'" href="tel:'+esc(d)+'" target="_top" title="Gọi '+esc(part)+'">'+esc(part)+'</a>';
+    return '<a class="customer-call '+esc(extraClass)+'" href="tel:'+esc(d)+'" target="_self" title="Gọi '+esc(part)+'" aria-label="Gọi '+esc(part)+'">📞 '+esc(part)+'</a>';
   });
   return links.join(' / ');
 }
@@ -3794,10 +3824,14 @@ body.v29-image-only #v29ImageOnlyNote{display:block}
     const rest=Array.from(state.selected.entries()).filter(([id])=>id!==k);
     state.selected.clear();state.selected.set(k,c);rest.forEach(([id,item])=>state.selected.set(id,item));
     try{resetStaleCurrentCustomer();updateSelectedUI()}catch(_){}
-    a.href=window.IDECO_V46.mobileUrl(c);a.target='_top';
+    a.href=window.IDECO_V46.mobileUrl(c);a.target='_self';
     const notify=()=>{openedKey=key(c);renderPanel();setStatus('Đã yêu cầu mở Zalo. Kiểm tra đúng khách và xác nhận gửi trong Zalo.','ok')};
-    window.IDECO_V46.show(c,notify,false);notify();
-    // Keep the default navigation on this real anchor; no timer, await or synthetic click.
+    e.preventDefault();
+    const url=window.IDECO_V46.mobileUrl(c);
+    window.IDECO_V49.launch(url,'zalo',phone(c));
+    notify();
+    // Image preparation happens after the direct app-launch request.
+    window.IDECO_V46.show(c,notify,false);
   }
   window.addEventListener('click',nativeMobileTap,true);
   window.IDECO_V35={openCurrent,openSpecific,finishCurrent,renderRows,renderPanel};
@@ -4118,7 +4152,7 @@ body.v36-show-customize #v36ToggleCustomize{border-color:#8b5cf6;background:#f5f
     if(typeof renderCustomers==='function' && !renderCustomers.__v38wrapped){
       const old=renderCustomers; window.renderCustomers=function(){const r=old.apply(this,arguments); setTimeout(renderReasons,0); setTimeout(installPreviewBar,0); return r}; window.renderCustomers.__v38wrapped=true;
     }
-    const body=$('customerBody'); if(body) new MutationObserver(()=>setTimeout(renderReasons,0)).observe(body,{childList:true,subtree:true});
+    const body=$('customerBody'); if(body) new MutationObserver(()=>setTimeout(renderReasons,0)).observe(body,{childList:true,subtree:false});
     try{database.ref(ROOT+'/customerClaims').on('value',()=>setTimeout(renderReasons,0))}catch(_){ }
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(install,180)); else setTimeout(install,180);
@@ -4164,7 +4198,7 @@ body.v36-show-customize #v36ToggleCustomize{border-color:#8b5cf6;background:#f5f
       window.updateSelectedUI=function(){const r=old.apply(this,arguments); setTimeout(renderSelectedListV39,0); return r;};
       window.updateSelectedUI.__v39wrapped=true;
     }
-    new MutationObserver(()=>setTimeout(renderSelectedListV39,0)).observe($('selectedList'),{childList:true,subtree:false});
+    // updateSelectedUI above owns list updates. Observing our own innerHTML caused a render loop.
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(install,180)); else setTimeout(install,180);
 })();
@@ -4714,7 +4748,7 @@ body.v40-show-customize #v26Customize{display:block!important}
     <div class="v46-sheet-head"><h3 id="v46Title">Gửi Zalo trên điện thoại</h3><button id="v46Close" type="button" aria-label="Đóng">×</button></div>
     <div id="v46Customer"></div>
     <div class="v46-actions">
-      <a id="v46Open" target="_top" rel="noopener">📲 Mở ứng dụng Zalo của khách</a>
+      <a id="v46Open" target="_self" rel="noopener">📲 Mở ứng dụng Zalo của khách</a>
       <a id="v48WebOpen" target="_top" rel="noopener">🔗 Mở bằng liên kết zalo.me</a>
       <button id="v46Share" type="button" disabled>📤 Chia sẻ ảnh → chọn Zalo</button>
       <button id="v46Download" type="button" disabled>⬇ Lưu ảnh để đính kèm Zalo</button>
@@ -4735,9 +4769,8 @@ body.v40-show-customize #v26Customize{display:block!important}
   function close(){generation++;$('v46Sheet').hidden=true;active=null;onOpened=null;clearFile();previousFocus?.focus?.();}
   function webMobileUrl(c){const p=localMobilePhone(c?.dienThoai);return p?'https://zalo.me/'+encodeURIComponent(p):'';}
   function mobileUrl(c){
-    const web=webMobileUrl(c);if(!web)return '';
-    if(/Android/i.test(navigator.userAgent))return 'intent://zalo.me/'+encodeURIComponent(localMobilePhone(c.dienThoai))+'#Intent;scheme=https;package=com.zing.zalo;S.browser_fallback_url='+encodeURIComponent(web)+';end';
-    return web;
+    const p=localMobilePhone(c?.dienThoai);
+    return p?'zalo://conversation?phone='+encodeURIComponent(p):'';
   }
   function stillValid(){return active&&activeMode===window.IDECO_V41?.getMode()&&(state.customers||[]).some(c=>customerKey(c)===customerKey(active))&&operatorReady()&&(!window.IDECO_V28?.getClaim(active)||!['sent','blocked','unavailable'].includes(window.IDECO_V28.getClaim(active).status))&&(!window.IDECO_V28?.getClaim(active)?.employeeName||norm(window.IDECO_V28.getClaim(active).employeeName)===norm(state.operator.employeeName));}
   function ensureValid(){if(stillValid()&&preparedSignature===outputSignature())return true;status('Khách hoặc trạng thái phụ trách đã thay đổi. Đóng khung và chọn lại khách.');return false;}
@@ -4773,7 +4806,7 @@ body.v40-show-customize #v26Customize{display:block!important}
   $('v46Sheet').addEventListener('click',e=>{if(e.target===$('v46Sheet'))close()});
   document.addEventListener('keydown',e=>{if($('v46Sheet').hidden)return;if(e.key==='Escape')close();if(e.key==='Tab'){const a=Array.from($('v46Sheet').querySelectorAll('button:not(:disabled),a[href]'));const first=a[0],last=a[a.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}});
   $('v48WebOpen').addEventListener('click',e=>{if(!ensureValid()){e.preventDefault();return;}onOpened?.();});
-  $('v46Open').addEventListener('click',e=>{if(!ensureValid()){e.preventDefault();return;}onOpened?.();status('Điện thoại sẽ xử lý liên kết Zalo của khách. Nếu đã đăng nhập trong ứng dụng, anh tiếp tục dùng tài khoản đó để gửi.');});
+  $('v46Open').addEventListener('click',e=>{if(!ensureValid()){e.preventDefault();return;}e.preventDefault();onOpened?.();window.IDECO_V49.launch(mobileUrl(active),'zalo',localMobilePhone(active.dienThoai));status('Đã yêu cầu điện thoại mở Zalo. Nếu chưa mở đúng khách, sao chép SĐT để tìm trong Zalo.');});
   $('v46Share').addEventListener('click',async()=>{
     if(!file||sharing||!ensureValid())return;const ticket=generation,notify=onOpened;sharing=true;
     try{await navigator.share({files:[file],title:'IDECO'});if(ticket===generation){notify?.();status('Đã chuyển ảnh qua bảng chia sẻ. Kiểm tra gửi thành công trong Zalo trước khi xác nhận ĐÃ GỬI.');}}
@@ -4801,7 +4834,7 @@ a.mobile-direct-zalo[aria-disabled="true"]{opacity:.5}
     document.querySelectorAll('button.row-zalo,button.open-zalo,button#v35Open').forEach(b=>{
       const a=document.createElement('a');
       for(const attr of b.attributes)if(!['type','disabled'].includes(attr.name))a.setAttribute(attr.name,attr.value);
-      a.classList.add('mobile-direct-zalo');a.innerHTML=b.innerHTML;a.target='_top';
+      a.classList.add('mobile-direct-zalo');a.innerHTML=b.innerHTML;a.target='_self';
       a.setAttribute('aria-disabled',b.disabled?'true':'false');b.replaceWith(a);
     });
     document.querySelectorAll('a.mobile-direct-zalo').forEach(a=>{
@@ -4819,6 +4852,22 @@ a.mobile-direct-zalo[aria-disabled="true"]{opacity:.5}
   let queued=false;
   const observer=new MutationObserver(()=>{if(queued)return;queued=true;queueMicrotask(()=>{queued=false;update()})});
   observer.observe(document.body,{childList:true,subtree:true});update();
+})();
+</script>
+<style id="v50-mobile-actions">
+@media(max-width:760px){
+  .customer-call{min-height:48px;padding:7px 10px;border-radius:9px;background:#ecfdf5;color:#166534!important;border:1px solid #bbf7d0;text-decoration:none;white-space:nowrap;box-sizing:border-box}
+  .row-zalo{min-height:48px;min-width:72px;touch-action:manipulation}
+}
+#v50OpenFullPage{padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;margin:8px;line-height:1.5}
+</style>
+<script id="v50-frame-help">
+(function(){
+ if(window.self===window.top)return;
+ const box=document.createElement('div');box.id='v50OpenFullPage';
+ const text=document.createElement('span');text.textContent='Đang mở trong khung nhúng. Để gọi điện hoặc mở Zalo thuận tiện: ';
+ const a=document.createElement('a');a.href=location.href;a.target='_blank';a.rel='noopener';a.textContent='Mở ứng dụng riêng';
+ box.append(text,a);document.body.prepend(box);
 })();
 </script>
 </body>
