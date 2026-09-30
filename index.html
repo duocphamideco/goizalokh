@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>V51 · IDECO V50 — Zalo mobile và gọi điện trực tiếp</title>
+<title>V52 · IDECO V50 — Zalo mobile và gọi điện trực tiếp</title>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -314,7 +314,7 @@ tbody tr:hover td{background:#fff3f3}
       const box=document.createElement('div');box.id='v49LaunchHelp';
       box.style.cssText='position:fixed;bottom:12px;left:12px;right:12px;max-width:540px;margin:auto;z-index:2147483647;background:white;color:#172554;border:2px solid #0068ff;border-radius:12px;padding:16px;box-shadow:0 8px 30px #0004;font:14px Arial;line-height:1.5';
       const msg=document.createElement('p');msg.textContent=kind==='call'?'Nếu màn hình gọi chưa mở, anh thử nút bên dưới.':'Nếu Zalo chưa mở đúng khách, anh sao chép SĐT để tìm khách trong Zalo.';box.appendChild(msg);
-      const link=document.createElement('a');link.textContent=kind==='call'?'📞 Mở bàn phím gọi':'📲 Thử mở Zalo';link.target='_self';link.href=kind==='call'&&/Android/i.test(navigator.userAgent)?'intent:'+number+'#Intent;scheme=tel;action=android.intent.action.DIAL;end':url;
+      const link=document.createElement('a');link.textContent=kind==='call'?'📞 Mở bàn phím gọi':'📲 Thử mở Zalo';link.target='_top';link.href=url;
       link.style.cssText='display:inline-block;padding:10px;background:#0068ff;color:white;border-radius:6px;margin:4px';box.appendChild(link);
       const cp=document.createElement('button');cp.textContent='Sao chép SĐT';cp.style.cssText='padding:10px;margin:4px';cp.onclick=async()=>{try{const ok=await copyTextValue(number);cp.textContent=ok===false?'Chưa sao chép được':'Đã sao chép';}catch(_){cp.textContent=number}};box.appendChild(cp);
       const note=document.createElement('p');note.textContent='Nếu vẫn không mở: mở website trực tiếp bằng Chrome, thay vì màn hình xem trước tệp hoặc trình duyệt bên trong ứng dụng.';box.appendChild(note);
@@ -322,22 +322,26 @@ tbody tr:hover td{background:#fff3f3}
     },1800);
   }
   function launch(url,kind,number){
-    if(!/^(tel:\+?\d+|zalo:\/\/conversation\?phone=\d+)$/.test(url))return false;
-    watch(kind,number,url);
-    // Synchronous navigation in the current frame, directly inside the user's tap.
-    // No top-frame redirect, package intent, store URL or timed app launch.
-    try{window.location.assign(url);return true;}catch(_){return false;}
+    if(!/^(tel:\+?\d+|sms:\+?\d+|zalo:\/\/conversation\?phone=\d+)$/.test(url))return false;
+    // Same routing as TIMKHTRENMOBILE: keep the tap synchronous, escape iframe.
+    // No store redirects and no awaited clipboard/image work before navigation.
+    hide();
+    try{window.top.location.href=url;return true;}
+    catch(_){try{window.location.href=url;return true;}catch(_){watch(kind,number,url);return false;}}
   }
   window.IDECO_V49={launch,watch};
   window.addEventListener('click',function(e){
-    const a=e.target.closest?.('a.customer-call[href^="tel:"]');if(!a)return;
-    const url=a.getAttribute('href');if(!/^tel:\+?\d+$/.test(url))return;
-    e.preventDefault();e.stopImmediatePropagation();launch(url,'call',url.slice(4));
+    const path=e.composedPath?e.composedPath():[e.target];
+    const a=path.find(n=>n?.matches?.('a.customer-call,a.customer-sms'));
+    if(!a)return;
+    const url=a.getAttribute('href');if(!/^(tel|sms):\+?\d+$/.test(url))return;
+    e.preventDefault();e.stopImmediatePropagation();
+    window.IDECO_V49.launch(url,url.startsWith('sms:')?'sms':'call',url.slice(4));
   },true);
 })();
 </script>
 </head>
-<body><div style="position:fixed;right:8px;bottom:3px;z-index:999;background:#ecfdf5;color:#166534;padding:3px 7px;border-radius:4px;font:11px Arial;pointer-events:none">IDECO V50</div>
+<body><div style="position:fixed;right:8px;bottom:3px;z-index:999;background:#ecfdf5;color:#166534;padding:3px 7px;border-radius:4px;font:11px Arial;pointer-events:none">IDECO V52</div>
 <div id="loginGate">
   <div class="login-card">
     <div class="logo-mark"><div class="logo-icon">◆</div><span>iDECO</span></div>
@@ -808,7 +812,7 @@ function customerCallLink(value, extraClass=''){
     if(/^84\d{9,10}$/.test(d))d='+'+d;
     if(/^[35789]\d{8}$/.test(d))d='0'+d;
     if(!/^(?:0\d{9,10}|\+[1-9]\d{7,14})$/.test(d))return esc(part);
-    return '<a class="customer-call '+esc(extraClass)+'" href="tel:'+esc(d)+'" target="_self" title="Gọi '+esc(part)+'" aria-label="Gọi '+esc(part)+'">📞 '+esc(part)+'</a>';
+    return '<a class="customer-call '+esc(extraClass)+'" href="tel:'+esc(d)+'" target="_top" title="Gọi '+esc(part)+'" aria-label="Gọi '+esc(part)+'">📞 '+esc(part)+'</a> <a class="customer-sms" href="sms:'+esc(d)+'" target="_top" aria-label="Nhắn SMS '+esc(part)+'">✉ SMS</a>';
   });
   return links.join(' / ');
 }
@@ -3832,7 +3836,7 @@ body.v29-image-only #v29ImageOnlyNote{display:block}
   async function selectAndOpen(c){if(!c)return;const g=gate(c);if(!g.ok){setStatus(g.msg,'bad');try{toast('⚠️ '+esc35(g.msg),5500)}catch(_){ }return}const k=key(c);if(!state.selected.has(k)){if(state.selected.size>=10){setStatus('Đã chọn đủ 10 khách.','bad');return}const held=claim(c);if(!(held&&held.status==='holding'&&same(held.employeeName,employee()))&&!await ensureClaim(c))return;state.selected.set(k,c)}else{const rest=Array.from(state.selected.entries()).filter(([rk])=>rk!==k);state.selected.clear();state.selected.set(k,c);rest.forEach(([rk,rv])=>state.selected.set(rk,rv))}try{resetStaleCurrentCustomer();updateSelectedUI()}catch(_){ }renderPanel();await openSpecific(c)}
   function install(){if(!window.state||!window.database||!window.ROOT||!document.querySelector('.batch-panel'))return setTimeout(install,250);ensureBox();renderPanel();renderRows();if(typeof renderCustomers==='function'&&!renderCustomers.__v35wrapped){const old=renderCustomers;window.renderCustomers=function(){const r=old.apply(this,arguments);renderRows();return r};window.renderCustomers.__v35wrapped=true}database.ref(ROOT+'/customerClaims').on('value',snap=>{state.customerClaims=snap.val()||{};renderRows();renderPanel()});document.addEventListener('click',e=>{const z=e.target.closest&&e.target.closest('.row-zalo');const ph=e.target.closest&&e.target.closest('.phone-link');if(z||ph){const c=findCustomerFromRow(z||ph);const cl=c&&claim(c);if(cl&&terminal.has(cl.status)){e.preventDefault();e.stopImmediatePropagation();const si=statusInfo(cl);setStatus(si?si.badge:'Khách này đã được xử lý.','warn');return false}e.preventDefault();e.stopImmediatePropagation();selectAndOpen(c);return false}},true);const badge=$('selectedBadge');if(badge)new MutationObserver(()=>renderPanel()).observe(badge,{childList:true,subtree:true,characterData:true});$('operatorName')?.addEventListener('change',()=>setTimeout(()=>{renderPanel();renderRows()},20));$('operatorDepartment')?.addEventListener('change',()=>setTimeout(()=>{renderPanel();renderRows()},20));setMode(sendMode())}
   function nativeMobileTap(e){
-    const a=e.target.closest?.('a.mobile-direct-zalo');
+    const a=(e.composedPath?e.composedPath():[e.target]).find(n=>n?.matches?.('a.mobile-direct-zalo'));
     if(!a||!window.IDECO_V46?.isMobile())return;
     e.stopImmediatePropagation();
     const c=a.id==='v35Open'?current():(state.customers||[]).find(x=>key(x)===a.dataset.key);
@@ -3847,14 +3851,14 @@ body.v29-image-only #v29ImageOnlyNote{display:block}
     }
     const k=key(c);
     if(!state.selected.has(k)&&state.selected.size>=10){e.preventDefault();setStatus('Đã chọn đủ 10 khách. Bỏ chọn một khách trước khi mở khách khác.','bad');return;}
+    e.preventDefault();
+    window.IDECO_V49.launch(window.IDECO_V46.mobileUrl(c),'zalo',phone(c));
     const rest=Array.from(state.selected.entries()).filter(([id])=>id!==k);
     state.selected.clear();state.selected.set(k,c);rest.forEach(([id,item])=>state.selected.set(id,item));
     try{resetStaleCurrentCustomer();updateSelectedUI()}catch(_){}
-    a.href=window.IDECO_V46.mobileUrl(c);a.target='_self';
+    a.href=window.IDECO_V46.mobileUrl(c);a.target='_top';
     const notify=()=>{openedKey=key(c);renderPanel();setStatus('Đã yêu cầu mở Zalo. Kiểm tra đúng khách và xác nhận gửi trong Zalo.','ok')};
     e.preventDefault();
-    const url=window.IDECO_V46.mobileUrl(c);
-    window.IDECO_V49.launch(url,'zalo',phone(c));
     notify();
     // Image preparation happens after the direct app-launch request.
     window.IDECO_V46.show(c,notify,false);
@@ -4860,7 +4864,7 @@ a.mobile-direct-zalo[aria-disabled="true"]{opacity:.5}
     document.querySelectorAll('#customerBody button.row-zalo,#selectedList button.open-zalo,button#v35Open').forEach(b=>{
       const a=document.createElement('a');
       for(const attr of b.attributes)if(!['type','disabled'].includes(attr.name))a.setAttribute(attr.name,attr.value);
-      a.classList.add('mobile-direct-zalo');a.innerHTML=b.innerHTML;a.target='_self';
+      a.classList.add('mobile-direct-zalo');a.innerHTML=b.innerHTML;a.target='_top';
       a.setAttribute('aria-disabled',b.disabled?'true':'false');b.replaceWith(a);
     });
     document.querySelectorAll('a.mobile-direct-zalo').forEach(a=>{
@@ -4914,6 +4918,9 @@ a.mobile-direct-zalo[aria-disabled="true"]{opacity:.5}
 #customerPageInfo{font-size:14px}
 .table-wrap{overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom}
 @media(max-width:760px){.pick-wrap{min-height:44px}.pick-checkbox{min-width:24px;min-height:24px} .table-card{backdrop-filter:none}}
+</style>
+<style id="v52-contact-style">
+.customer-sms{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:4px 8px;box-sizing:border-box;color:#075985;background:#e0f2fe;border-radius:8px;text-decoration:none;touch-action:manipulation;white-space:nowrap;font-size:13px}
 </style>
 </body>
 </html>
