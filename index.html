@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>IDECO V50 — Zalo mobile và gọi điện trực tiếp</title>
+<title>V51 · IDECO V50 — Zalo mobile và gọi điện trực tiếp</title>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1314,8 +1314,33 @@ function pruneSelection(){
   for(const k of state.selected.keys()) if(!valid.has(k)) state.selected.delete(k);
   updateSelectedUI();
 }
+// V51: bound the live DOM; filtering always runs before pagination.
+const customerPaging={page:0,size:40,signature:''};
 function renderCustomers(){
-  const list=filteredCustomers();
+  let matches=filteredCustomers();
+  const status=$('v37StatusFilter')?.value||'all';
+  if(status!=='all') matches=matches.filter(c=>{
+    const value=window.IDECO_V28?.getClaim(c)?.status;
+    return (['sent','holding','unavailable','blocked'].includes(value)?value:'none')===status;
+  });
+  const signature=[$('searchInput').value,status,window.IDECO_V41?.getMode(),matches.length].join('|');
+  if(signature!==customerPaging.signature){customerPaging.page=0;customerPaging.signature=signature;}
+  const pages=Math.max(1,Math.ceil(matches.length/customerPaging.size));
+  customerPaging.page=Math.max(0,Math.min(customerPaging.page,pages-1));
+  const offset=customerPaging.page*customerPaging.size;
+  const list=matches.slice(offset,offset+customerPaging.size);
+  window.IDECO_VISIBLE_CUSTOMERS=new Map(list.map(c=>[customerKey(c),c]));
+  let pager=$('customerPager');
+  if(!pager){
+    pager=document.createElement('nav');pager.id='customerPager';pager.setAttribute('aria-label','Phân trang khách hàng');
+    pager.innerHTML='<button type="button" id="customerPrevious">← Trước</button><span id="customerPageInfo" aria-live="polite"></span><button type="button" id="customerNext">Sau →</button>';
+    document.querySelector('.table-card .toolbar').after(pager);
+    $('customerPrevious').onclick=()=>{customerPaging.page--;renderCustomers();};
+    $('customerNext').onclick=()=>{customerPaging.page++;renderCustomers();};
+  }
+  $('customerPrevious').disabled=customerPaging.page===0;
+  $('customerNext').disabled=customerPaging.page>=pages-1;
+  $('customerPageInfo').textContent=matches.length?`${offset+1}–${offset+list.length} / ${matches.length} khách · Trang ${customerPaging.page+1}/${pages}`:'0 khách phù hợp';
   $('customerCount').textContent=state.customers.length+' khách hàng';
   const body=$('customerBody');
   if(!list.length){body.innerHTML='<tr><td colspan="7" class="empty">Không có dữ liệu phù hợp.</td></tr>';return;}
@@ -2251,7 +2276,8 @@ $('copyImageBtn').addEventListener('click',copyImage);
 $('saveMessageTemplate').addEventListener('click',()=>{localStorage.setItem('ideco_cdev_message_template',$('messageTemplate').value);updateMessagePreview();toast('✅ Đã lưu mẫu lời chào trên máy này.');});
 $('messageTemplate').addEventListener('input',updateMessagePreview);
 $('copyCurrentMessage').addEventListener('click',()=>{const c=activeCustomerForPreview();if(c)copyTextValue(customerMessage(c));});
-$('searchInput').addEventListener('input',renderCustomers);
+let customerSearchTimer;
+$('searchInput').addEventListener('input',()=>{clearTimeout(customerSearchTimer);customerSearchTimer=setTimeout(()=>renderCustomers(),150)});
 $('clearSearch').addEventListener('click',()=>{$('searchInput').value='';renderCustomers()});
 
 $('openManualCustomer').addEventListener('click',openManualCustomer);
@@ -3236,7 +3262,7 @@ Nội dung thư đã tự đồng bộ cách xưng hô ${r.salutation==='Anh/Ch�
       tr.classList.remove('claimed-self','claimed-other','sent-v33');
       tr.querySelectorAll('.claim-badge-v28,.claim-meta-v28,.claim-release-v28,.sent-badge-v33,.sent-meta-v33').forEach(x=>x.remove());
       const key=tr.getAttribute('data-key')||'';
-      const c=(state.customers||[]).find(x=>(typeof customerKey==='function'?customerKey(x):'')===key);
+      const c=window.IDECO_VISIBLE_CUSTOMERS?.get(key);
       if(!c) return;
       const cl=getClaim(c); if(!cl) return;
       const sent=cl.status==='sent';
@@ -3359,7 +3385,7 @@ Nội dung thư đã tự đồng bộ cách xưng hô ${r.salutation==='Anh/Ch�
 
     byId('operatorName')?.addEventListener('change',()=>setTimeout(()=>{purgeSelectionsClaimedByOthers();applyClaimMarks();},0));
     byId('operatorDept')?.addEventListener('change',()=>setTimeout(applyClaimMarks,0));
-    byId('searchInput')?.addEventListener('input',()=>setTimeout(applyClaimMarks,20));
+    // V51: render wrapper updates claim marks after debounced search.
     setTimeout(applyClaimMarks,100);
   }
   window.IDECO_V28={claimCustomer,releaseCustomer,markCustomerSent,getClaim,claimId,applyClaimMarks,isSentClaim};
@@ -3801,8 +3827,8 @@ body.v29-image-only #v29ImageOnlyNote{display:block}
     const msg=status==='sent'?'Xác nhận đã GỬI ZALO cho “'+(c.tenKhachHang||'khách hàng')+'” và chuyển khách tiếp theo?':status==='unavailable'?'Ghi nhận “Không tìm thấy / Chưa kết bạn” cho khách này và chuyển khách tiếp theo?':'Ghi nhận “Bị chặn / Không thể nhắn” cho khách này và chuyển khách tiếp theo?';if(!confirm(msg)){try{if(nextWin&&!nextWin.closed)nextWin.close()}catch(_){ }return}
     const saved=await writeTerminal(c,status);if(!saved||!saved.ok){try{if(nextWin&&!nextWin.closed)nextWin.close()}catch(_){ }return}await saveActivity(c,status);try{state.selected.delete(key(c));resetStaleCurrentCustomer();updateSelectedUI()}catch(_){ }openedKey='';try{if(window.IDECO_V28&&IDECO_V28.applyClaimMarks)IDECO_V28.applyClaimMarks()}catch(_){ }renderRows();renderPanel();const n=current();if(n&&window.IDECO_V46?.isMobile()){await mobileOpen(n);return;}if(n){let cp;try{cp=copyPayload(n)}catch(e){cp=Promise.reject(e)}const w=openWindowFor(n,nextWin);openedKey=key(n);renderPanel();try{await cp;setStatus((status==='sent'?'✅ Đã lưu ĐÃ GỬI + tên nhân viên trên Firebase.':'✅ Đã lưu trạng thái trên Firebase.')+'\n➡ ĐÃ TỰ CHUYỂN sang '+(n.tenKhachHang||'khách tiếp theo')+' · '+phone(n)+'. Zalo đã được mở và nội dung đã chuẩn bị. Kiểm tra đúng khách rồi Ctrl+V → Gửi.','ok')}catch(e){setStatus('✅ Đã lưu khách vừa xử lý và tự mở '+(n.tenKhachHang||'khách tiếp theo')+'.\n⚠️ Chưa copy được nội dung tự động; bấm “MỞ ZALO KHÁCH NÀY” nếu cần.','warn')}}else{try{if(nextWin&&!nextWin.closed)nextWin.close()}catch(_){ }setStatus(status==='sent'?'✅ Đã lưu ĐÃ GỬI + tên nhân viên trên Firebase. Đã xử lý hết danh sách đã chọn.':'✅ Đã lưu trạng thái. Đã xử lý hết danh sách đã chọn.','ok')}}
   function statusInfo(cl){if(!cl)return null;if(cl.status==='sent')return{cls:'sent',row:'v35-sent-row',badge:'✅ ĐÃ GỬI ZALO · '+(cl.sentBy||cl.employeeName||'NV'),meta:(cl.department?cl.department+' · ':'')+(cl.sentAt?'gửi '+fmt(cl.sentAt):(cl.sendDate?'ngày '+cl.sendDate:''))};if(cl.status==='unavailable')return{cls:'unavailable',row:'v35-unavailable-row',badge:'⚠️ KHÔNG TÌM THẤY / CHƯA KẾT BẠN · '+(cl.processedBy||cl.employeeName||'NV'),meta:(cl.department?cl.department+' · ':'')+(cl.processedAt?'cập nhật '+fmt(cl.processedAt):(cl.sendDate?'ngày '+cl.sendDate:''))};if(cl.status==='blocked')return{cls:'blocked',row:'v35-blocked-row',badge:'⛔ BỊ CHẶN / KHÔNG THỂ NHẮN · '+(cl.processedBy||cl.employeeName||'NV'),meta:(cl.department?cl.department+' · ':'')+(cl.processedAt?'cập nhật '+fmt(cl.processedAt):(cl.sendDate?'ngày '+cl.sendDate:''))};return null}
-  function renderRows(){clearTimeout(renderTimer);renderTimer=setTimeout(()=>{const body=$('customerBody');if(!body||!window.state)return;body.querySelectorAll('tr[data-key]').forEach(tr=>{tr.classList.remove('v35-sent-row','v35-unavailable-row','v35-blocked-row');tr.querySelectorAll('.v35-status-badge,.v35-status-meta,.v35-customer-status').forEach(x=>x.remove());const c=(state.customers||[]).find(x=>key(x)===tr.dataset.key);if(!c)return;const cl=claim(c),si=statusInfo(cl);if(!si)return;tr.classList.add(si.row);const cb=tr.querySelector('.pick-checkbox');if(cb){cb.checked=false;cb.disabled=true}const z=tr.querySelector('.row-zalo');if(z)z.disabled=true;const pick=tr.querySelector('.pick-wrap span:last-child');if(pick)pick.textContent=cl.status==='sent'?'Đã gửi':'Đã xử lý';const staff=tr.querySelector('td.staff')||tr.children[5];if(staff){staff.querySelectorAll('.claim-badge-v28,.claim-meta-v28,.claim-release-v28,.sent-badge-v33,.sent-meta-v33').forEach(x=>x.remove());const b=document.createElement('span');b.className='v35-status-badge '+si.cls;b.textContent=si.badge;staff.appendChild(b);const m=document.createElement('span');m.className='v35-status-meta';m.textContent=si.meta;staff.appendChild(m)}const name=tr.querySelector('.customer-name');if(name){const s=document.createElement('span');s.className='v35-customer-status '+si.cls;s.textContent=cl.status==='sent'?'✓ Đã gửi — '+(cl.sentBy||cl.employeeName||'NV'):cl.status==='unavailable'?'⚠ Chưa kết bạn/không tìm thấy — '+(cl.processedBy||cl.employeeName||'NV'):'⛔ Không thể nhắn — '+(cl.processedBy||cl.employeeName||'NV');name.appendChild(s)}})},15)}
-  function findCustomerFromRow(el){const tr=el&&el.closest&&el.closest('tr[data-key]');if(!tr)return null;return (state.customers||[]).find(c=>key(c)===tr.dataset.key)||null}
+  function renderRows(){clearTimeout(renderTimer);renderTimer=setTimeout(()=>{const body=$('customerBody');if(!body||!window.state)return;body.querySelectorAll('tr[data-key]').forEach(tr=>{tr.classList.remove('v35-sent-row','v35-unavailable-row','v35-blocked-row');tr.querySelectorAll('.v35-status-badge,.v35-status-meta,.v35-customer-status').forEach(x=>x.remove());const c=window.IDECO_VISIBLE_CUSTOMERS?.get(tr.dataset.key);if(!c)return;const cl=claim(c),si=statusInfo(cl);if(!si)return;tr.classList.add(si.row);const cb=tr.querySelector('.pick-checkbox');if(cb){cb.checked=false;cb.disabled=true}const z=tr.querySelector('.row-zalo');if(z)z.disabled=true;const pick=tr.querySelector('.pick-wrap span:last-child');if(pick)pick.textContent=cl.status==='sent'?'Đã gửi':'Đã xử lý';const staff=tr.querySelector('td.staff')||tr.children[5];if(staff){staff.querySelectorAll('.claim-badge-v28,.claim-meta-v28,.claim-release-v28,.sent-badge-v33,.sent-meta-v33').forEach(x=>x.remove());const b=document.createElement('span');b.className='v35-status-badge '+si.cls;b.textContent=si.badge;staff.appendChild(b);const m=document.createElement('span');m.className='v35-status-meta';m.textContent=si.meta;staff.appendChild(m)}const name=tr.querySelector('.customer-name');if(name){const s=document.createElement('span');s.className='v35-customer-status '+si.cls;s.textContent=cl.status==='sent'?'✓ Đã gửi — '+(cl.sentBy||cl.employeeName||'NV'):cl.status==='unavailable'?'⚠ Chưa kết bạn/không tìm thấy — '+(cl.processedBy||cl.employeeName||'NV'):'⛔ Không thể nhắn — '+(cl.processedBy||cl.employeeName||'NV');name.appendChild(s)}})},15)}
+  function findCustomerFromRow(el){const tr=el&&el.closest&&el.closest('tr[data-key]');if(!tr)return null;return window.IDECO_VISIBLE_CUSTOMERS?.get(tr.dataset.key)||null}
   async function selectAndOpen(c){if(!c)return;const g=gate(c);if(!g.ok){setStatus(g.msg,'bad');try{toast('⚠️ '+esc35(g.msg),5500)}catch(_){ }return}const k=key(c);if(!state.selected.has(k)){if(state.selected.size>=10){setStatus('Đã chọn đủ 10 khách.','bad');return}const held=claim(c);if(!(held&&held.status==='holding'&&same(held.employeeName,employee()))&&!await ensureClaim(c))return;state.selected.set(k,c)}else{const rest=Array.from(state.selected.entries()).filter(([rk])=>rk!==k);state.selected.clear();state.selected.set(k,c);rest.forEach(([rk,rv])=>state.selected.set(rk,rv))}try{resetStaleCurrentCustomer();updateSelectedUI()}catch(_){ }renderPanel();await openSpecific(c)}
   function install(){if(!window.state||!window.database||!window.ROOT||!document.querySelector('.batch-panel'))return setTimeout(install,250);ensureBox();renderPanel();renderRows();if(typeof renderCustomers==='function'&&!renderCustomers.__v35wrapped){const old=renderCustomers;window.renderCustomers=function(){const r=old.apply(this,arguments);renderRows();return r};window.renderCustomers.__v35wrapped=true}database.ref(ROOT+'/customerClaims').on('value',snap=>{state.customerClaims=snap.val()||{};renderRows();renderPanel()});document.addEventListener('click',e=>{const z=e.target.closest&&e.target.closest('.row-zalo');const ph=e.target.closest&&e.target.closest('.phone-link');if(z||ph){const c=findCustomerFromRow(z||ph);const cl=c&&claim(c);if(cl&&terminal.has(cl.status)){e.preventDefault();e.stopImmediatePropagation();const si=statusInfo(cl);setStatus(si?si.badge:'Khách này đã được xử lý.','warn');return false}e.preventDefault();e.stopImmediatePropagation();selectAndOpen(c);return false}},true);const badge=$('selectedBadge');if(badge)new MutationObserver(()=>renderPanel()).observe(badge,{childList:true,subtree:true,characterData:true});$('operatorName')?.addEventListener('change',()=>setTimeout(()=>{renderPanel();renderRows()},20));$('operatorDepartment')?.addEventListener('change',()=>setTimeout(()=>{renderPanel();renderRows()},20));setMode(sendMode())}
   function nativeMobileTap(e){
@@ -4037,13 +4063,13 @@ body.v36-show-customize #v36ToggleCustomize{border-color:#8b5cf6;background:#f5f
     const tb=document.querySelector('.table-card .toolbar'); if(!tb||$('v37StatusFilter'))return;
     const sel=document.createElement('select'); sel.id='v37StatusFilter'; sel.setAttribute('aria-label','Lọc trạng thái gửi Zalo');
     sel.innerHTML='<option value="all">Tất cả trạng thái</option><option value="none">Chưa gửi</option><option value="sent">Đã gửi Zalo</option><option value="holding">Đang phụ trách</option><option value="unavailable">Không tìm thấy / chưa kết bạn</option><option value="blocked">Bị chặn / không thể nhắn</option>';
-    sel.addEventListener('change',applyFilter); tb.appendChild(sel);
+    sel.addEventListener('change',()=>renderCustomers()); tb.appendChild(sel);
   }
   function render(){
     ensureHeader(); ensureFilter();
     const body=$('customerBody'); if(!body||!window.state)return;
     body.querySelectorAll('tr[data-key]').forEach(tr=>{
-      const c=(state.customers||[]).find(x=>key(x)===tr.dataset.key); if(!c)return;
+      const c=window.IDECO_VISIBLE_CUSTOMERS?.get(tr.dataset.key); if(!c)return;
       const cl=getClaim(c), sd=statusData(cl);
       let td=tr.querySelector('.v37-send-status-cell');
       if(!td){td=document.createElement('td');td.className='v37-send-status-cell';const action=tr.lastElementChild;tr.insertBefore(td,action)}
@@ -4110,7 +4136,7 @@ body.v36-show-customize #v36ToggleCustomize{border-color:#8b5cf6;background:#f5f
   function renderReasons(){
     const body=$('customerBody'); if(!body||!window.state) return;
     body.querySelectorAll('tr[data-key]').forEach(tr=>{
-      const c=(state.customers||[]).find(x=>key(x)===tr.dataset.key); if(!c) return;
+      const c=window.IDECO_VISIBLE_CUSTOMERS?.get(tr.dataset.key); if(!c) return;
       const pickCell=tr.children[0]; if(!pickCell) return;
       pickCell.querySelectorAll('.v38-disabled-reason,.v38-pick-tip').forEach(x=>x.remove());
       const r=reasonData(c);
@@ -4140,7 +4166,7 @@ body.v36-show-customize #v36ToggleCustomize{border-color:#8b5cf6;background:#f5f
       const wrap=e.target.closest('.pick-wrap,.pick-checkbox,.row-zalo');
       if(!wrap) return;
       const tr=e.target.closest('tr[data-key]'); if(!tr) return;
-      const c=(state.customers||[]).find(x=>key(x)===tr.dataset.key); if(!c) return;
+      const c=window.IDECO_VISIBLE_CUSTOMERS?.get(tr.dataset.key); if(!c) return;
       const r=reasonData(c); if(!r) return;
       if(typeof toast==='function') toast('⚠️ '+r.toast,5000); else alert(r.toast);
       e.preventDefault(); e.stopPropagation();
@@ -4491,7 +4517,7 @@ body.v40-show-customize #v26Customize{display:block!important}
   function install(){
     if(typeof state==='undefined'||typeof database==='undefined'||typeof ROOT==='undefined'||!document.querySelector('.table-card'))return setTimeout(install,250);
     ensureTabs();applyCustomerSource();overrideFilter();wrapRender();ensureSettingsCard();
-    const s=$v('searchInput');if(s&&!s.__v41){s.__v41=true;s.addEventListener('input',()=>setTimeout(postRender,0))}
+    const s=$v('searchInput');if(s&&!s.__v41){s.__v41=true;s.addEventListener('input',()=>{})}
     postRender();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,220));else setTimeout(install,220);
@@ -4636,7 +4662,7 @@ body.v40-show-customize #v26Customize{display:block!important}
   function install(){
     if(typeof state==='undefined'||typeof database==='undefined'||!document.querySelector('.table-card'))return setTimeout(install,250);
     if(!ensureSettings43())return setTimeout(install,100);patchPartnerFilter();listen43();
-    const s=$('searchInput');if(s&&!s.__v43){s.__v43=true;s.addEventListener('input',()=>setTimeout(refreshPartnerView,0))}
+    const s=$('searchInput');if(s&&!s.__v43){s.__v43=true;s.addEventListener('input',()=>{})}
     refreshPartnerView();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,300));else setTimeout(install,300);
@@ -4831,7 +4857,7 @@ a.mobile-direct-zalo[aria-disabled="true"]{opacity:.5}
 (function(){
   function update(){
     if(!window.IDECO_V46?.isMobile())return;
-    document.querySelectorAll('button.row-zalo,button.open-zalo,button#v35Open').forEach(b=>{
+    document.querySelectorAll('#customerBody button.row-zalo,#selectedList button.open-zalo,button#v35Open').forEach(b=>{
       const a=document.createElement('a');
       for(const attr of b.attributes)if(!['type','disabled'].includes(attr.name))a.setAttribute(attr.name,attr.value);
       a.classList.add('mobile-direct-zalo');a.innerHTML=b.innerHTML;a.target='_self';
@@ -4840,7 +4866,7 @@ a.mobile-direct-zalo[aria-disabled="true"]{opacity:.5}
     document.querySelectorAll('a.mobile-direct-zalo').forEach(a=>{
       let c;
       if(a.id==='v35Open')c=Array.from(state.selected.values()).find(c=>!['sent','blocked','unavailable'].includes(window.IDECO_V28?.getClaim(c)?.status));
-      else c=(state.customers||[]).find(c=>customerKey(c)===a.dataset.key);
+      else c=window.IDECO_VISIBLE_CUSTOMERS?.get(a.dataset.key)||state.selected.get(a.dataset.key);
       const href=c?IDECO_V46.mobileUrl(c):'';
       const cl=c&&window.IDECO_V28?.getClaim(c);
       const disabled=!href||['sent','blocked','unavailable'].includes(cl?.status);
@@ -4849,9 +4875,20 @@ a.mobile-direct-zalo[aria-disabled="true"]{opacity:.5}
       if(!href&&a.hasAttribute('href'))a.removeAttribute('href');
     });
   }
-  let queued=false;
-  const observer=new MutationObserver(()=>{if(queued)return;queued=true;queueMicrotask(()=>{queued=false;update()})});
-  observer.observe(document.body,{childList:true,subtree:true});update();
+  let timer=0;
+  function schedule(){if(!timer)timer=setTimeout(()=>{timer=0;update()},32)}
+  function install(){
+    if(!window.IDECO_V46?.isMobile())return;
+    // Only watch list replacements and the send panel, never the whole document.
+    for(const id of ['customerBody','selectedList','v35SimpleSend']){
+      const host=document.getElementById(id);if(!host)continue;
+      new MutationObserver(records=>{
+        if(records.some(r=>r.type==='attributes'||Array.from(r.addedNodes).some(n=>n.nodeType===1)))schedule();
+      }).observe(host,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled']});
+    }
+    update();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,400));else setTimeout(install,400);
 })();
 </script>
 <style id="v50-mobile-actions">
@@ -4870,5 +4907,13 @@ a.mobile-direct-zalo[aria-disabled="true"]{opacity:.5}
  box.append(text,a);document.body.prepend(box);
 })();
 </script>
+<style id="v51-performance">
+#customerPager{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px;flex-wrap:wrap}
+#customerPager button{min-height:44px;padding:8px 16px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#164e63;font-weight:700;touch-action:manipulation}
+#customerPager button:disabled{opacity:.4}
+#customerPageInfo{font-size:14px}
+.table-wrap{overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom}
+@media(max-width:760px){.pick-wrap{min-height:44px}.pick-checkbox{min-width:24px;min-height:24px} .table-card{backdrop-filter:none}}
+</style>
 </body>
 </html>
