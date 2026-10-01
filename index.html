@@ -301,6 +301,66 @@ tbody tr:hover td{background:#fff3f3}
 <style id="ideco-v47-call-style">
 .customer-call{display:inline-flex;align-items:center;min-height:44px;color:#0068ff!important;font-weight:800;text-decoration:underline;touch-action:manipulation}
 </style>
+<script id="ideco-v53-ios-contact">
+(function(){
+'use strict';
+const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent||'') || (/Macintosh/i.test(navigator.userAgent||'') && navigator.maxTouchPoints>1);
+if(!ios)return;
+let sheet=null,previousFocus=null;
+const byId=id=>document.getElementById(id);
+function digits(raw){let d=String(raw||'').replace(/\D/g,'');if(d.startsWith('0084'))d=d.slice(2);if(d.startsWith('84')&&d.length>=10)d='0'+d.slice(2);return d;}
+function close(){if(sheet)sheet.hidden=true;previousFocus?.focus?.();}
+function install(){
+ if(sheet)return;
+ const style=document.createElement('style');style.textContent=`
+#iosContactSheet{position:fixed;inset:0;z-index:2147483646;background:#0f172a99;display:flex;align-items:flex-end;justify-content:center;padding:12px 12px calc(16px + env(safe-area-inset-bottom,0px));box-sizing:border-box}
+#iosContactSheet[hidden]{display:none!important}
+#iosContactSheet .ios-contact-card{box-sizing:border-box;width:100%;max-width:500px;max-height:90dvh;overflow:auto;background:white;color:#172554;border-radius:20px;padding:18px;font:14px system-ui;box-shadow:0 10px 40px #0004}
+#iosContactSheet h3{margin:0 0 8px;font-size:18px;overflow-wrap:anywhere}
+#iosContactSheet input{box-sizing:border-box;width:100%;font-size:16px;padding:11px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:10px;margin-bottom:12px;user-select:text;-webkit-user-select:text}
+#iosContactSheet .ios-contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+#iosContactSheet a,#iosContactSheet button{box-sizing:border-box;display:flex;align-items:center;justify-content:center;min-height:50px;padding:10px;border:0;border-radius:10px;font:700 14px system-ui;text-decoration:none;background:#eff6ff;color:#0753b9;cursor:pointer;touch-action:manipulation}
+#iosContactSheet .ios-zalo{background:#0068ff;color:#fff}#iosContactSheet .ios-sim{background:#15803d;color:#fff}
+#iosContactSheet p{font-size:12px;line-height:1.6;margin:10px 0;color:#475569}#iosContactClose{width:100%}
+`;
+ document.head.appendChild(style);sheet=document.createElement('div');sheet.id='iosContactSheet';sheet.hidden=true;
+ sheet.innerHTML='<section class="ios-contact-card" role="dialog" aria-modal="true" aria-labelledby="iosContactTitle"><h3 id="iosContactTitle">Liên hệ khách hàng</h3><input id="iosContactNumber" readonly aria-label="Số điện thoại"><div class="ios-contact-grid"><a id="iosContactChat" class="ios-zalo" target="_blank" rel="noopener">💬 Chat Zalo</a><a id="iosContactFriend" class="ios-zalo" target="_blank" rel="noopener">👤 Kết bạn Zalo</a><a id="iosContactCallZalo" class="ios-zalo" target="_blank" rel="noopener">📞 Gọi Zalo</a><a id="iosContactSim" class="ios-sim" target="_top">📱 Gọi SIM</a><a id="iosContactSms" target="_top">✉️ Gửi SMS</a><button id="iosContactCopy" type="button">📋 Chép số</button></div><p>Các nút Zalo mở hồ sơ khách. Trong Zalo, chọn Nhắn tin, Kết bạn hoặc biểu tượng gọi. Nếu chưa tìm được khách, chép số rồi tìm trong Zalo.</p><p id="iosContactStatus" role="status"></p><button id="iosContactClose" type="button">Đóng</button></section>';
+ document.body.appendChild(sheet);
+ byId('iosContactClose').addEventListener('click',close);sheet.addEventListener('click',e=>{if(e.target===sheet)close();});
+ byId('iosContactCopy').addEventListener('click',()=>{
+  const input=byId('iosContactNumber'),status=byId('iosContactStatus');
+  function fallback(){input.focus();input.select();input.setSelectionRange(0,input.value.length);let ok=false;try{ok=document.execCommand('copy');}catch(_){}status.textContent=ok?'Đã chép số điện thoại.':'Nhấn giữ số điện thoại ở trên rồi chọn Sao chép.';}
+  if(navigator.clipboard?.writeText)navigator.clipboard.writeText(input.value).then(()=>{status.textContent='Đã chép số điện thoại.';},fallback);else fallback();
+ });
+ document.addEventListener('keydown',e=>{
+  if(sheet.hidden)return;if(e.key==='Escape')close();
+  if(e.key==='Tab'){const all=Array.from(sheet.querySelectorAll('input,a[href],button'));const first=all[0],last=all[all.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}
+ });
+}
+function open(raw,name){
+ const number=digits(raw);if(number.length<8||number.length>15)return;
+ install();previousFocus=document.activeElement;
+ byId('iosContactTitle').textContent='📞 '+(name||'Liên hệ khách hàng');byId('iosContactNumber').value=number;
+ const intl=number.startsWith('0')?'84'+number.slice(1):number;
+ ['iosContactChat','iosContactFriend','iosContactCallZalo'].forEach(id=>byId(id).href='https://zalo.me/'+intl);
+ byId('iosContactSim').href='tel:'+number;byId('iosContactSms').href='sms:'+number;
+ byId('iosContactStatus').textContent='';sheet.hidden=false;byId('iosContactClose').focus();
+}
+// Window capture runs before V49's direct-call handler and document handlers.
+window.addEventListener('click',function(e){
+ const path=e.composedPath?e.composedPath():[e.target];
+ if(path.some(el=>el?.id==='iosContactSheet'))return; // SIM/SMS buttons must navigate, not reopen this menu.
+ const link=path.find(el=>el?.matches?.('a.customer-call,a[href^="tel:"]'));
+ if(!link)return;const href=link.getAttribute('href')||'';if(!/^tel:/i.test(href))return;
+ const number=digits(href.slice(4));if(number.length<8||number.length>15)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const row=link.closest?.('tr,li,.batch-log-row');const name=row?.querySelector('td.customer-name,.customer-name,b,.cust')?.textContent?.trim()||'';
+ open(number,name);
+},true);
+window.IDECO_IOS_CONTACT={open,close};
+})();
+
+</script>
 <script id="ideco-v49-phone-routing">
 (function(){
   let timer=0, pending=null;
