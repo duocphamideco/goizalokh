@@ -557,7 +557,7 @@ Trân trọng mong phản hồi ạ!
       <span class="badge ok" id="customerCount">0 khách hàng</span>
     </div>
     <div class="toolbar">
-      <div class="search"><input id="searchInput" placeholder="Tìm tên khách hàng, người liên hệ, SĐT, địa chỉ, nhân viên phụ trách…"></div>
+      <label style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">Nhóm hàng (KH hợp tác)<select id="partnerCategoryFilter" onchange="renderCustomers()" style="padding:10px;border:1px solid #ddd;border-radius:8px"><option value="all">Tất cả nhóm hàng</option><option value="drug">Thuốc</option><option value="nonDrug">Không thuốc</option></select></label><div class="search"><input id="searchInput" placeholder="Tìm tên khách hàng, người liên hệ, SĐT, địa chỉ, nhân viên, thuốc / không thuốc…"></div>
       <button class="btn btn-light" id="clearSearch">Xóa tìm kiếm</button>
       <button class="btn btn-green" id="openManualCustomer">➕ Thêm khách hàng thủ công</button>
       <button class="btn btn-blue" id="aiAnalyzeSelected">🤖 AI xưng hô khách đã chọn</button>
@@ -1312,6 +1312,7 @@ function applyCustomerSource(){
     if(current.has(k))state.selected.set(k,current.get(k));else state.selected.delete(k);
   }
 }
+function hasCustomerCategory(value){const x=norm(String(value??''));return !!x&&!['false','0','khong','no','n','none','null','-','khong thuoc'].includes(x);}
 function filteredCustomers(){
   const q=norm($('searchInput').value);
   const base=state.customers||[];
@@ -1387,7 +1388,7 @@ function renderCustomers(){
     const value=window.IDECO_V28?.getClaim(c)?.status;
     return (['sent','holding','unavailable','blocked'].includes(value)?value:'none')===status;
   });
-  const signature=[$('searchInput').value,status,window.IDECO_V41?.getMode(),matches.length].join('|');
+  const signature=[$('searchInput').value,status,$('partnerCategoryFilter')?.value,window.IDECO_V41?.getMode(),matches.length].join('|');
   if(signature!==customerPaging.signature){customerPaging.page=0;customerPaging.signature=signature;}
   const pages=Math.max(1,Math.ceil(matches.length/customerPaging.size));
   customerPaging.page=Math.max(0,Math.min(customerPaging.page,pages-1));
@@ -1417,7 +1418,7 @@ function renderCustomers(){
         <input type="checkbox" class="pick-checkbox" data-key="${esc(key)}" ${entry?'checked':''} ${p?'':'disabled'}>
         <span class="order-badge">${order}</span><span>${p?'Chọn':'Thiếu SĐT'}</span>
       </label></td>
-      <td class="customer-name">${esc(c.tenKhachHang||'')}${c._source==='manual'?'<span class="manual-source-badge">THỦ CÔNG</span>':''}</td>
+      <td class="customer-name">${esc(c.tenKhachHang||'')}${c._source==='partnerExcel'?`<div style="font-size:12px;font-weight:600;color:#475569;margin-top:6px">Thuốc: ${hasCustomerCategory(c.thuoc)?'Có':'—'} · Không thuốc: ${hasCustomerCategory(c.khongThuoc)?'Có':'—'}</div>`:''}${c._source==='manual'?'<span class="manual-source-badge">THỦ CÔNG</span>':''}</td>
       <td>${esc(c.nguoiLienHe||'')}${c.nguoiLienHe?`<span class="ai-salute-badge">${esc(salutationForCustomer(c))}</span>`:''}</td>
       <td>${customerCallLink(c.dienThoai)}</td>
       <td>${map?`<a class="map-link" href="${map}" data-map-address="${esc(c.diaChi||'')}" data-map-name="${esc(c.tenKhachHang||'')}" title="Xem bản đồ ngay trong ứng dụng: ${esc(c.diaChi||'')}">${esc(c.diaChi||'')}</a>`:esc(c.diaChi||'')}</td>
@@ -2096,8 +2097,8 @@ function previewImport(){
 function dedupe(rows){
   const m=new Map();for(const c of rows){const k=customerKey(c);if(!k||k==='n:|a:')continue;if(!m.has(k))m.set(k,c)}return Array.from(m.values());
 }
-function rowsObject(rows){const o={};rows.forEach((c,i)=>o['r'+String(i+1).padStart(6,'0')]={tenKhachHang:c.tenKhachHang||'',nguoiLienHe:c.nguoiLienHe||'',dienThoai:c.dienThoai||'',diaChi:c.diaChi||'',nhanVien:c.nhanVien||''});return o;}
-function fileRows(v){return Object.values(v?.rows||{}).filter(Boolean).map(c=>({tenKhachHang:c.tenKhachHang||'',nguoiLienHe:c.nguoiLienHe||'',dienThoai:c.dienThoai||'',diaChi:c.diaChi||'',nhanVien:c.nhanVien||''}));}
+function rowsObject(rows){const o={};rows.forEach((c,i)=>o['r'+String(i+1).padStart(6,'0')]={tenKhachHang:c.tenKhachHang||'',nguoiLienHe:c.nguoiLienHe||'',dienThoai:c.dienThoai||'',diaChi:c.diaChi||'',nhanVien:c.nhanVien||'',thuoc:c.thuoc??'',khongThuoc:c.khongThuoc??''});return o;}
+function fileRows(v){return Object.values(v?.rows||{}).filter(Boolean).map(c=>({tenKhachHang:c.tenKhachHang||'',nguoiLienHe:c.nguoiLienHe||'',dienThoai:c.dienThoai||'',diaChi:c.diaChi||'',nhanVien:c.nhanVien||'',thuoc:c.thuoc??'',khongThuoc:c.khongThuoc??''}));}
 function renderPendingExcelFiles(){
   const box=$('pendingExcelFiles');if(!box)return;$('pendingFileCount').textContent=state.pendingExcelFiles.length+' file';
   if(!state.pendingExcelFiles.length){box.innerHTML='<div class="empty" style="padding:12px">Chưa chọn file.</div>';return;}
@@ -2147,7 +2148,7 @@ async function ensureCustomerFilesMigration(){
   try{
     const fs=await database.ref(ROOT+'/customerFiles').once('value');if(fs.exists())return;
     const cs=await database.ref(ROOT+'/customers').once('value');if(!cs.exists())return;
-    const rows=Object.values(cs.val()||{}).map(c=>({tenKhachHang:c.tenKhachHang||'',nguoiLienHe:c.nguoiLienHe||'',dienThoai:c.dienThoai||'',diaChi:c.diaChi||'',nhanVien:c.nhanVien||'',xungHo:c.xungHo||''}));
+    const rows=Object.values(cs.val()||{}).map(c=>({tenKhachHang:c.tenKhachHang||'',nguoiLienHe:c.nguoiLienHe||'',dienThoai:c.dienThoai||'',diaChi:c.diaChi||'',nhanVien:c.nhanVien||'',thuoc:c.thuoc??'',khongThuoc:c.khongThuoc??'',xungHo:c.xungHo||''}));
     if(!rows.length)return;
     await database.ref(ROOT+'/customerFiles/legacy_current').set({name:'Dữ liệu cũ đã chuyển sang V20',rowCount:rows.length,uploadedAt:Date.now(),uploadedBy:'V20 migration',department:'',legacy:true,rows:rowsObject(dedupe(rows))});
   }catch(e){console.warn('Migration customerFiles:',e)}
@@ -2342,7 +2343,7 @@ $('messageTemplate').addEventListener('input',updateMessagePreview);
 $('copyCurrentMessage').addEventListener('click',()=>{const c=activeCustomerForPreview();if(c)copyTextValue(customerMessage(c));});
 let customerSearchTimer;
 $('searchInput').addEventListener('input',()=>{clearTimeout(customerSearchTimer);customerSearchTimer=setTimeout(()=>renderCustomers(),150)});
-$('clearSearch').addEventListener('click',()=>{$('searchInput').value='';renderCustomers()});
+$('clearSearch').addEventListener('click',()=>{$('searchInput').value='';$('partnerCategoryFilter').value='all';renderCustomers()});
 
 $('openManualCustomer').addEventListener('click',openManualCustomer);
 $('manualCustomerClose').addEventListener('click',closeManualCustomer);
@@ -4607,7 +4608,7 @@ body.v40-show-customize #v26Customize{display:block!important}
   const $=id=>document.getElementById(id);
   const esc43=s=>String(s==null?'':s).replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
   const norm43=s=>typeof norm==='function'?norm(s):String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
-  function fileRows43(v){return Object.values(v&&v.rows||{}).filter(Boolean).map(c=>({tenKhachHang:c.tenKhachHang||'',nguoiLienHe:c.nguoiLienHe||'',dienThoai:c.dienThoai||'',diaChi:c.diaChi||'',nhanVien:c.nhanVien||'',_source:'partnerExcel',_partnerFileId:v.id||''}));}
+  function fileRows43(v){return Object.values(v&&v.rows||{}).filter(Boolean).map(c=>({tenKhachHang:c.tenKhachHang||'',nguoiLienHe:c.nguoiLienHe||'',dienThoai:c.dienThoai||'',diaChi:c.diaChi||'',nhanVien:c.nhanVien||'',thuoc:c.thuoc??'',khongThuoc:c.khongThuoc??'',_source:'partnerExcel',_partnerFileId:v.id||''}));}
   function allPartnerRows(){
     const rows=[];for(const f of PARTNER_EXCEL_STATE.files||[]) rows.push(...fileRows43(f));
     const m=new Map();for(const c of rows){const k=customerKey(c);if(!k||k==='p:|n:|lh:|a:')continue;if(!m.has(k))m.set(k,c);else if(!m.get(k).nhanVien&&c.nhanVien)m.get(k).nhanVien=c.nhanVien;}return [...m.values()];
@@ -4637,23 +4638,27 @@ body.v40-show-customize #v26Customize{display:block!important}
     let hr=Math.max(1,Number($('v43HeaderRow').value)||1)-1;if(hr>=PARTNER_EXCEL_STATE.aoa.length)hr=0;
     const headers=(PARTNER_EXCEL_STATE.aoa[hr]||[]).map((v,i)=>String(v??'').trim()||('Cột '+(i+1)));
     headerOptions(headers,$('v43MapName'),'name');headerOptions(headers,$('v43MapContact'),'contact');headerOptions(headers,$('v43MapPhone'),'phone');headerOptions(headers,$('v43MapAddress'),'address');headerOptions(headers,$('v43MapStaff'),'staff');
+    for(const [id,aliases] of [['v43MapDrug',['thuoc','thuoc (danh muc)']],['v43MapNonDrug',['khong thuoc','dat hang non-drugs','non-drugs']]]){
+      headerOptions(headers,$(id),'classification');
+      $(id).value=String(headers.findIndex(h=>aliases.includes(norm43(h))));
+    }
     $('v43Preview').disabled=false;
     $('v43Summary').innerHTML=`File đang soi chiếu: <b>${esc43(PARTNER_EXCEL_STATE.name)}</b> · ${PARTNER_EXCEL_STATE.aoa.length} dòng · dòng tiêu đề ${hr+1}.`;
     const f=PARTNER_EXCEL_STATE.pending.find(x=>x.id===PARTNER_EXCEL_STATE.activeId);if(f)f.headerRow=hr+1;
   }
   function buildRows43(){
     const aoa=PARTNER_EXCEL_STATE.aoa;if(!aoa)return[];const hr=Math.max(1,Number($('v43HeaderRow').value)||1)-1;
-    const idx={tenKhachHang:Number($('v43MapName').value),nguoiLienHe:Number($('v43MapContact').value),dienThoai:Number($('v43MapPhone').value),diaChi:Number($('v43MapAddress').value),nhanVien:Number($('v43MapStaff').value)};
+    const idx={tenKhachHang:Number($('v43MapName').value),nguoiLienHe:Number($('v43MapContact').value),dienThoai:Number($('v43MapPhone').value),diaChi:Number($('v43MapAddress').value),nhanVien:Number($('v43MapStaff').value),thuoc:Number($('v43MapDrug').value),khongThuoc:Number($('v43MapNonDrug').value)};
     if(idx.tenKhachHang<0)throw new Error('Cần chọn cột Tên khách hàng.');
     const get=(r,i)=>i>=0?String((r||[])[i]??'').trim():'';
-    const raw=aoa.slice(hr+1).map(r=>({tenKhachHang:get(r,idx.tenKhachHang),nguoiLienHe:get(r,idx.nguoiLienHe),dienThoai:get(r,idx.dienThoai),diaChi:get(r,idx.diaChi),nhanVien:get(r,idx.nhanVien)})).filter(c=>c.tenKhachHang);
+    const raw=aoa.slice(hr+1).map(r=>({tenKhachHang:get(r,idx.tenKhachHang),nguoiLienHe:get(r,idx.nguoiLienHe),dienThoai:get(r,idx.dienThoai),diaChi:get(r,idx.diaChi),nhanVien:get(r,idx.nhanVien),thuoc:get(r,idx.thuoc),khongThuoc:get(r,idx.khongThuoc)})).filter(c=>c.tenKhachHang);
     const before=raw.length;const unique=dedupe(raw);return {rows:unique,before,duplicatesRemoved:before-unique.length};
   }
   function preview43(){
     try{
       const x=buildRows43();PARTNER_EXCEL_STATE.rows=x.rows;$('v43Save').disabled=!x.rows.length;
       const sample=x.rows.slice(0,10);const valid=x.rows.filter(c=>localMobilePhone(c.dienThoai)).length;
-      $('v43PreviewBox').innerHTML=`<table><thead><tr><th>Tên khách hàng</th><th>Người liên hệ</th><th>Điện thoại</th><th>Địa chỉ</th><th>Nhân viên</th></tr></thead><tbody>${sample.map(c=>`<tr><td>${esc43(c.tenKhachHang)}</td><td>${esc43(c.nguoiLienHe)}</td><td>${customerCallLink(c.dienThoai)}</td><td>${esc43(c.diaChi)}</td><td>${esc43(c.nhanVien)}</td></tr>`).join('')}</tbody></table>`;
+      $('v43PreviewBox').innerHTML=`<table><thead><tr><th>Tên khách hàng</th><th>Người liên hệ</th><th>Điện thoại</th><th>Địa chỉ</th><th>Nhân viên</th><th>Thuốc</th><th>Không thuốc</th></tr></thead><tbody>${sample.map(c=>`<tr><td>${esc43(c.tenKhachHang)}</td><td>${esc43(c.nguoiLienHe)}</td><td>${customerCallLink(c.dienThoai)}</td><td>${esc43(c.diaChi)}</td><td>${esc43(c.nhanVien)}</td><td>${esc43(c.thuoc)}</td><td>${esc43(c.khongThuoc)}</td></tr>`).join('')}</tbody></table>`;
       $('v43Summary').innerHTML=`✅ Đã chuẩn hóa <b>${x.rows.length}</b> khách · loại <b>${x.duplicatesRemoved}</b> dòng trùng trong file · <b>${valid}</b> SĐT di động hợp lệ. <b>${x.rows.filter(c=>c.nhanVien).length}</b> khách có nhân viên phụ trách. Các dòng thiếu/sai SĐT vẫn được lưu nhưng sẽ không chọn gửi Zalo.`;
       $('v43Status').textContent='Đã xem trước dữ liệu. Kiểm tra cột rồi bấm Lưu.';
     }catch(e){PARTNER_EXCEL_STATE.rows=[];$('v43Save').disabled=true;$('v43Status').textContent='❌ '+(e.message||e)}
@@ -4684,33 +4689,34 @@ body.v40-show-customize #v26Customize{display:block!important}
       const existing=new Set(allPartnerRows().map(customerKey));
       const uniqueNew=x.rows.filter(c=>!existing.has(customerKey(c)));
       const duplicateExisting=x.rows.length-uniqueNew.length;
-      // Cập nhật nhân viên của khách trùng, không tạo thêm khách và không xóa tên bằng ô trống.
-      const incoming=new Map(x.rows.filter(c=>c.nhanVien).map(c=>[customerKey(c),c.nhanVien]));
+      // Cập nhật nhân viên / phân loại của khách trùng, không tạo thêm khách và không xóa tên bằng ô trống.
+      const incoming=new Map(x.rows.map(c=>[customerKey(c),c]));
       const updates={},changedKeys=new Set();
       for(const f of PARTNER_EXCEL_STATE.files){for(const [rowId,c] of Object.entries(f.rows||{})){
-        if(!c)continue;const k=customerKey(c),staff=incoming.get(k);
+        if(!c)continue;const k=customerKey(c),row=incoming.get(k),staff=row?.nhanVien;
+        if(row)for(const [field,id] of [['thuoc','v43MapDrug'],['khongThuoc','v43MapNonDrug']]){if(Number($(id).value)>=0&&row[field]!==c[field]){updates[f.id+'/rows/'+rowId+'/'+field]=row[field];changedKeys.add(k);}}
         if(staff&&staff!==c.nhanVien){updates[f.id+'/rows/'+rowId+'/nhanVien']=staff;changedKeys.add(k);}
       }}
-      const map={name:Number($('v43MapName').value),contact:Number($('v43MapContact').value),phone:Number($('v43MapPhone').value),address:Number($('v43MapAddress').value),staff:Number($('v43MapStaff').value)};
+      const map={name:Number($('v43MapName').value),contact:Number($('v43MapContact').value),phone:Number($('v43MapPhone').value),address:Number($('v43MapAddress').value),staff:Number($('v43MapStaff').value),thuoc:Number($('v43MapDrug').value),khongThuoc:Number($('v43MapNonDrug').value)};
       const ref=database.ref(PARTNER_FILE_PATH).push();
       const rec={name:PARTNER_EXCEL_STATE.name||'Excel khách hàng hợp tác',rowCount:uniqueNew.length,duplicateSkipped:duplicateExisting,uploadedAt:Date.now(),uploadedBy:state.operator?.employeeName||'',department:state.operator?.department||'',headerRow:Math.max(1,Number($('v43HeaderRow').value)||1),mapping:map,rows:rowsObject(uniqueNew),sourceType:'partnerExcel'};
-      $('v43Save').disabled=true;$('v43Status').textContent='Đang lưu khách hàng và cập nhật nhân viên…';
+      $('v43Save').disabled=true;$('v43Status').textContent='Đang lưu khách hàng và cập nhật nhân viên / phân loại…';
       if(uniqueNew.length)updates[ref.key]=rec;
       if(Object.keys(updates).length)await database.ref(PARTNER_FILE_PATH).update(updates);
       window.IDECO_V41?.setMode('partner');
-      PARTNER_EXCEL_STATE.pending=PARTNER_EXCEL_STATE.pending.filter(x=>x.id!==PARTNER_EXCEL_STATE.activeId);PARTNER_EXCEL_STATE.activeId='';PARTNER_EXCEL_STATE.aoa=null;PARTNER_EXCEL_STATE.name='';PARTNER_EXCEL_STATE.rows=[];$('v43PreviewBox').innerHTML='';$('v43Preview').disabled=true;$('v43Reload').disabled=true;$('v43Save').disabled=true;$('v43Status').textContent=`✅ Đã lưu ${rec.rowCount} khách mới · cập nhật nhân viên ${changedKeys.size} khách đã tồn tại.`;renderPending43();if(PARTNER_EXCEL_STATE.pending.length)activate43(PARTNER_EXCEL_STATE.pending[0].id);toast(`🤝 Đã lưu ${rec.rowCount} khách hợp tác vào Firebase riêng. Cập nhật nhân viên ${changedKeys.size} khách trùng.`,5000);
+      PARTNER_EXCEL_STATE.pending=PARTNER_EXCEL_STATE.pending.filter(x=>x.id!==PARTNER_EXCEL_STATE.activeId);PARTNER_EXCEL_STATE.activeId='';PARTNER_EXCEL_STATE.aoa=null;PARTNER_EXCEL_STATE.name='';PARTNER_EXCEL_STATE.rows=[];$('v43PreviewBox').innerHTML='';$('v43Preview').disabled=true;$('v43Reload').disabled=true;$('v43Save').disabled=true;$('v43Status').textContent=`✅ Đã lưu ${rec.rowCount} khách mới · cập nhật nhân viên / phân loại ${changedKeys.size} khách đã tồn tại.`;renderPending43();if(PARTNER_EXCEL_STATE.pending.length)activate43(PARTNER_EXCEL_STATE.pending[0].id);toast(`🤝 Đã lưu ${rec.rowCount} khách hợp tác vào Firebase riêng. Cập nhật nhân viên / phân loại ${changedKeys.size} khách trùng.`,5000);
     }catch(e){$('v43Status').textContent='❌ Không lưu được: '+(e.message||e);$('v43Save').disabled=false}
   }
   async function delete43(id){const f=PARTNER_EXCEL_STATE.files.find(x=>x.id===id);if(!f)return;if(!confirm(`Xóa file hợp tác “${f.name||'file'}”? Dữ liệu của file này sẽ không còn trong tab Khách hàng hợp tác.`))return;try{await database.ref(PARTNER_FILE_PATH+'/'+id).remove();toast('🗑 Đã xóa file khách hàng hợp tác.');}catch(e){toast('❌ Không xóa được: '+(e.message||e),6000)}}
   function ensureSettings43(){
     if($('v43PartnerExcelSettings'))return true;
     const host=$('v41PartnerSettings');if(!host)return false;
-    const sec=document.createElement('div');sec.className='v43-partner-excel';sec.id='v43PartnerExcelSettings';sec.innerHTML=`<div class="v43-head">📊 Upload Excel danh sách khách hàng hợp tác — nguồn Firebase riêng</div><div class="v43-body"><div class="security-note">Phần này hoạt động giống <b>Excel khách hàng mới</b>: chọn nhiều file → <b>Soi chiếu cột</b> → xem trước → lưu. Dữ liệu chỉ hiển thị ở tab <b>Khách hàng hợp tác</b>, độc lập với tab <b>Khách hàng mới khai thác</b>. Hệ thống tự <b>chống trùng trong file và giữa các file hợp tác</b> theo khóa khách hàng. Tải lại file sẽ cập nhật nhân viên cho khách trùng; ô nhân viên trống không xóa tên đã lưu. Với file ERP, kiểm tra mục Nhân viên phụ trách chọn <b>I — Nhân viên phụ trách</b>.</div><div class="inline" style="margin-top:10px"><input id="v43ExcelInput" type="file" accept=".xlsx,.xls" multiple><label class="small"><b>Dòng tiêu đề:</b> <input id="v43HeaderRow" type="number" min="1" value="1" style="width:72px;padding:7px;border:1px solid #ccc;border-radius:7px"></label><button class="btn btn-light" id="v43Reload" disabled>↻ Đọc lại tiêu đề</button></div><div class="v43-file-panel"><div class="v43-file-head"><span>📥 File đang chờ soi chiếu/lưu</span><span id="v43PendingCount">0 file</span></div><div class="v43-file-list" id="v43Pending"><div class="empty" style="padding:12px">Chưa chọn file.</div></div></div><div class="v43-grid"><div class="field"><label>Tên khách hàng *</label><select id="v43MapName"></select></div><div class="field"><label>Người liên hệ</label><select id="v43MapContact"></select></div><div class="field"><label>Điện thoại</label><select id="v43MapPhone"></select></div><div class="field"><label>Địa chỉ</label><select id="v43MapAddress"></select></div><div class="field"><label>Nhân viên phụ trách</label><select id="v43MapStaff"></select></div></div><div class="inline" style="margin-top:10px"><button class="btn btn-blue" id="v43Preview" disabled>👁 Xem trước dữ liệu</button><button class="btn btn-green" id="v43Save" disabled>💾 Lưu vào KHÁCH HÀNG HỢP TÁC</button><span class="small muted" id="v43Status"></span></div><div class="v43-summary" id="v43Summary">Chọn file Excel để bắt đầu soi chiếu.</div><div id="v43PreviewBox"></div><div class="v43-dedupe-note" id="v43SavedSummary">☁️ Firebase riêng: đang tải dữ liệu…</div><div class="v43-file-panel"><div class="v43-file-head"><span>☁️ File Excel hợp tác đã lưu</span><span id="v43SavedCount">0 file</span></div><div class="v43-file-list" id="v43Saved"><div class="empty" style="padding:12px">Đang tải…</div></div></div></div>`;
+    const sec=document.createElement('div');sec.className='v43-partner-excel';sec.id='v43PartnerExcelSettings';sec.innerHTML=`<div class="v43-head">📊 Upload Excel danh sách khách hàng hợp tác — nguồn Firebase riêng</div><div class="v43-body"><div class="security-note">Phần này hoạt động giống <b>Excel khách hàng mới</b>: chọn nhiều file → <b>Soi chiếu cột</b> → xem trước → lưu. Dữ liệu chỉ hiển thị ở tab <b>Khách hàng hợp tác</b>, độc lập với tab <b>Khách hàng mới khai thác</b>. Hệ thống tự <b>chống trùng trong file và giữa các file hợp tác</b> theo khóa khách hàng. Tải lại file sẽ cập nhật nhân viên / phân loại cho khách trùng; ô nhân viên trống không xóa tên đã lưu. Hai cột phân loại đã chọn sẽ cập nhật theo Excel (kể cả ô trống); chọn “Không có / để trống” để giữ dữ liệu cũ. Với file ERP, kiểm tra mục Nhân viên phụ trách chọn <b>I — Nhân viên phụ trách</b>.</div><div class="inline" style="margin-top:10px"><input id="v43ExcelInput" type="file" accept=".xlsx,.xls" multiple><label class="small"><b>Dòng tiêu đề:</b> <input id="v43HeaderRow" type="number" min="1" value="1" style="width:72px;padding:7px;border:1px solid #ccc;border-radius:7px"></label><button class="btn btn-light" id="v43Reload" disabled>↻ Đọc lại tiêu đề</button></div><div class="v43-file-panel"><div class="v43-file-head"><span>📥 File đang chờ soi chiếu/lưu</span><span id="v43PendingCount">0 file</span></div><div class="v43-file-list" id="v43Pending"><div class="empty" style="padding:12px">Chưa chọn file.</div></div></div><div class="v43-grid"><div class="field"><label>Tên khách hàng *</label><select id="v43MapName"></select></div><div class="field"><label>Người liên hệ</label><select id="v43MapContact"></select></div><div class="field"><label>Điện thoại</label><select id="v43MapPhone"></select></div><div class="field"><label>Địa chỉ</label><select id="v43MapAddress"></select></div><div class="field"><label>Nhân viên phụ trách</label><select id="v43MapStaff"></select></div><div class="field"><label>Thuốc — cột J</label><select id="v43MapDrug"></select></div><div class="field"><label>Không thuốc — cột K</label><select id="v43MapNonDrug"></select></div></div><div class="inline" style="margin-top:10px"><button class="btn btn-blue" id="v43Preview" disabled>👁 Xem trước dữ liệu</button><button class="btn btn-green" id="v43Save" disabled>💾 Lưu vào KHÁCH HÀNG HỢP TÁC</button><span class="small muted" id="v43Status"></span></div><div class="v43-summary" id="v43Summary">Chọn file Excel để bắt đầu soi chiếu.</div><div id="v43PreviewBox"></div><div class="v43-dedupe-note" id="v43SavedSummary">☁️ Firebase riêng: đang tải dữ liệu…</div><div class="v43-file-panel"><div class="v43-file-head"><span>☁️ File Excel hợp tác đã lưu</span><span id="v43SavedCount">0 file</span></div><div class="v43-file-list" id="v43Saved"><div class="empty" style="padding:12px">Đang tải…</div></div></div></div>`;
     host.appendChild(sec);
     $('v43ExcelInput').addEventListener('change',e=>{add43(e.target.files);e.target.value=''});
     $('v43Pending').addEventListener('click',e=>{const m=e.target.closest('[data-v43-map]'),d=e.target.closest('[data-v43-pdel]');if(m)activate43(m.dataset.v43Map);if(d){const id=d.dataset.v43Pdel;PARTNER_EXCEL_STATE.pending=PARTNER_EXCEL_STATE.pending.filter(x=>x.id!==id);if(PARTNER_EXCEL_STATE.activeId===id){PARTNER_EXCEL_STATE.activeId='';PARTNER_EXCEL_STATE.aoa=null;PARTNER_EXCEL_STATE.name='';PARTNER_EXCEL_STATE.rows=[];$('v43PreviewBox').innerHTML='';$('v43Preview').disabled=true;$('v43Save').disabled=true;$('v43Reload').disabled=true;if(PARTNER_EXCEL_STATE.pending.length)activate43(PARTNER_EXCEL_STATE.pending[0].id)}renderPending43();}});
     $('v43Saved').addEventListener('click',e=>{const d=e.target.closest('[data-v43-sdel]');if(d)delete43(d.dataset.v43Sdel)});
-    for(const id of ['v43MapName','v43MapContact','v43MapPhone','v43MapAddress','v43MapStaff'])$(id).addEventListener('change',preview43);
+    for(const id of ['v43MapName','v43MapContact','v43MapPhone','v43MapAddress','v43MapStaff','v43MapDrug','v43MapNonDrug'])$(id).addEventListener('change',preview43);
     $('v43HeaderRow').addEventListener('change',()=>{loadHeaders43();preview43()});
     $('v43Reload').addEventListener('click',()=>{loadHeaders43();preview43()});$('v43Preview').addEventListener('click',preview43);$('v43Save').addEventListener('click',save43);
     renderSavedPartnerFiles();return true;
@@ -4720,7 +4726,17 @@ body.v40-show-customize #v26Customize{display:block!important}
     window.filteredCustomers=function(){
       const q=norm43($('searchInput')?.value||'');
       const base=state.customers||[];
-      return !q?base:base.filter(c=>norm43([c.tenKhachHang,c.nguoiLienHe,c.dienThoai,c.diaChi,c.nhanVien].join(' ')).includes(q));
+      const partner=window.IDECO_V41?.getMode?.()==='partner';
+      const category=partner?($('partnerCategoryFilter')?.value||'all'):'all';
+      return base.filter(c=>{
+        if(partner){
+          if(category==='drug'&&!hasCustomerCategory(c.thuoc))return false;
+          if(category==='nonDrug'&&!hasCustomerCategory(c.khongThuoc))return false;
+          if(q==='thuoc')return hasCustomerCategory(c.thuoc);
+          if(['khong thuoc','non-drugs','non drugs'].includes(q))return hasCustomerCategory(c.khongThuoc);
+        }
+        return !q||norm43([c.tenKhachHang,c.nguoiLienHe,c.dienThoai,c.diaChi,c.nhanVien].join(' ')).includes(q);
+      });
     };
   }
   function install(){
